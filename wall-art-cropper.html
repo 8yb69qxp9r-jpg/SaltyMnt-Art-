@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wall Art Cropper</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #111115;
+  --card: #1a1a1f;
+  --border: #2a2a30;
+  --gold: #c9a55a;
+  --gold-dark: #a07c3a;
+  --gold-light: #e0c07a;
+  --text: #e8e4dc;
+  --text-dim: #888;
+  --text-muted: #666;
+  --inactive: #333;
+  --font-display: 'Playfair Display', serif;
+  --font-body: 'DM Sans', sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 2.2rem;
+  color: var(--gold);
+  text-align: center;
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  margin-bottom: 32px;
+}
+
+/* Global prefix */
+.global-prefix {
+  margin-bottom: 24px;
+}
+
+.global-prefix label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.global-prefix input {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.global-prefix input:focus {
+  border-color: var(--gold);
+}
+
+.global-prefix input::placeholder {
+  color: var(--text-muted);
+}
+
+/* Drop zone */
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 48px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.25s, background 0.25s;
+  margin-bottom: 32px;
+  position: relative;
+}
+
+.dropzone:hover, .dropzone.dragover {
+  border-color: var(--gold);
+  background: rgba(201, 165, 90, 0.06);
+}
+
+.dropzone-icon {
+  font-size: 2rem;
+  margin-bottom: 10px;
+  opacity: 0.7;
+}
+
+.dropzone-text {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+}
+
+.dropzone-text strong {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.dropzone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* Image cards */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  overflow: hidden;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  gap: 10px;
+}
+
+.card-filename {
+  font-weight: 600;
+  font-size: 0.9rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-dims {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.card-warning {
+  background: rgba(201, 165, 90, 0.15);
+  color: var(--gold);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.card-remove {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.2s, background 0.2s;
+  line-height: 1;
+}
+
+.card-remove:hover {
+  color: #e55;
+  background: rgba(238, 85, 85, 0.1);
+}
+
+/* Preview area */
+.preview-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #0d0d10;
+  padding: 12px;
+  min-height: 120px;
+}
+
+.preview-wrap img {
+  max-width: 680px;
+  max-height: 320px;
+  width: auto;
+  height: auto;
+  display: block;
+}
+
+/* Crop overlay (SVG-based) */
+.crop-overlay {
+  position: absolute;
+  top: 0; left: 0;
+  pointer-events: none;
+}
+
+.crop-overlay .crop-rect {
+  pointer-events: all;
+  cursor: grab;
+}
+
+.crop-overlay .crop-rect:active {
+  cursor: grabbing;
+}
+
+.crop-border {
+  fill: none;
+  stroke: white;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+/* Controls section */
+.card-controls {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Button groups */
+.btn-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-group label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.btn {
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 7px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--inactive);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.btn:hover {
+  border-color: #444;
+  color: var(--text);
+}
+
+.btn.active {
+  background: rgba(201, 165, 90, 0.15);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+
+.btn.size-btn.active {
+  background: rgba(201, 165, 90, 0.12);
+  border-color: var(--gold-dark);
+  color: var(--gold-light);
+}
+
+/* Manual crop controls */
+.manual-crop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.manual-crop-row select {
+  background: var(--inactive);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  padding: 7px 10px;
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+}
+
+.manual-crop-row select:focus {
+  border-color: var(--gold);
+}
+
+/* Generate button */
+.btn-generate {
+  width: 100%;
+  padding: 12px;
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #c9a55a, #a07c3a);
+  color: #111;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+  letter-spacing: 0.02em;
+}
+
+.btn-generate:hover {
+  opacity: 0.9;
+}
+
+.btn-generate:active {
+  transform: scale(0.99);
+}
+
+.btn-generate:disabled {
+  background: var(--inactive);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+/* Results */
+.results-section {
+  border-top: 1px solid var(--border);
+  padding: 16px;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.result-item {
+  background: #0d0d10;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.result-item img {
+  width: 100%;
+  aspect-ratio: auto;
+  display: block;
+  max-height: 140px;
+  object-fit: contain;
+  background: #0a0a0e;
+}
+
+.result-info {
+  padding: 8px 10px;
+}
+
+.result-label {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: var(--gold-light);
+}
+
+.result-dims {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.result-dl {
+  display: block;
+  text-align: center;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gold);
+  text-decoration: none;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  transition: background 0.2s;
+  cursor: pointer;
+  background: none;
+  font-family: var(--font-body);
+  width: 100%;
+}
+
+.result-dl:hover {
+  background: rgba(201, 165, 90, 0.1);
+}
+
+.btn-download-all {
+  width: 100%;
+  padding: 11px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 700;
+  border: 1px solid var(--gold-dark);
+  border-radius: 8px;
+  background: rgba(201, 165, 90, 0.1);
+  color: var(--gold);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-download-all:hover {
+  background: rgba(201, 165, 90, 0.18);
+}
+
+.btn-download-all:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Wall Art Cropper</h1>
+  <p class="subtitle">Batch-crop images into standard print sizes at 300 DPI</p>
+
+  <div class="global-prefix">
+    <label for="prefixInput">Custom Filename Prefix</label>
+    <input type="text" id="prefixInput" placeholder="Leave blank to use original filename">
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon">🖼️</div>
+    <div class="dropzone-text">Drag & drop images here or <strong>click to browse</strong></div>
+    <div class="dropzone-text" style="font-size:0.8rem;margin-top:6px;color:#555">JPEG / PNG — batch supported</div>
+    <input type="file" id="fileInput" accept="image/jpeg,image/png" multiple>
+  </div>
+
+  <div id="cardsContainer"></div>
+</div>
+
+<script>
+const DPI = 300;
+
+const PORTRAIT_SIZES = [
+  { label: '4×6', w: 4, h: 6 },
+  { label: '5×7', w: 5, h: 7 },
+  { label: '8×10', w: 8, h: 10 },
+  { label: '11×14', w: 11, h: 14 },
+];
+
+const LANDSCAPE_SIZES = [
+  { label: '9×12', w: 12, h: 9 },
+  { label: '16×20', w: 20, h: 16 },
+  { label: '18×24', w: 24, h: 18 },
+  { label: '24×36', w: 36, h: 24 },
+  { label: 'A2', w: 23.4, h: 16.5 },
+];
+
+let images = []; // { file, dataUrl, naturalWidth, naturalHeight, orientation, sizeEnabled[], manualCrop, manualCropPositions, manualCropSizeIndex, results[] }
+
+const cardsContainer = document.getElementById('cardsContainer');
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const prefixInput = document.getElementById('prefixInput');
+
+// Drag and drop
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => { handleFiles(e.target.files); e.target.value = ''; });
+
+function handleFiles(files) {
+  for (const file of files) {
+    if (!file.type.match(/^image\/(jpeg|png)$/)) continue;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        images.push({
+          file,
+          dataUrl: ev.target.result,
+          naturalWidth: img.naturalWidth,
+          naturalHeight: img.naturalHeight,
+          orientation: 'portrait',
+          sizeEnabled: PORTRAIT_SIZES.map(() => true),
+          manualCrop: false,
+          manualCropPositions: {},
+          manualCropSizeIndex: 0,
+          results: null,
+        });
+        renderAll();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function slugify(name) {
+  return name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase();
+}
+
+function getPrefix(imgData) {
+  const global = prefixInput.value.trim();
+  return global || slugify(imgData.file.name);
+}
+
+function getSizes(orientation) {
+  return orientation === 'portrait' ? PORTRAIT_SIZES : LANDSCAPE_SIZES;
+}
+
+function getAspectRatio(size) {
+  return size.w / size.h;
+}
+
+function autoCropRegion(imgW, imgH, targetRatio) {
+  let cw, ch;
+  if (imgW / imgH > targetRatio) {
+    ch = imgH;
+    cw = Math.round(ch * targetRatio);
+  } else {
+    cw = imgW;
+    ch = Math.round(cw / targetRatio);
+  }
+  cw = Math.min(cw, imgW);
+  ch = Math.min(ch, imgH);
+  const cx = Math.round((imgW - cw) / 2);
+  const cy = Math.round((imgH - ch) / 2);
+  return { x: cx, y: cy, w: cw, h: ch };
+}
+
+function is16x9(w, h) {
+  const r = w / h;
+  return Math.abs(r - 16 / 9) < 0.02;
+}
+
+function renderAll() {
+  cardsContainer.innerHTML = '';
+  if (images.length === 0) {
+    cardsContainer.innerHTML = '<div class="empty-state">No images loaded yet.</div>';
+    return;
+  }
+  images.forEach((imgData, idx) => renderCard(imgData, idx));
+}
+
+function renderCard(imgData, idx) {
+  const sizes = getSizes(imgData.orientation);
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'card-header';
+
+  const fname = document.createElement('span');
+  fname.className = 'card-filename';
+  fname.textContent = imgData.file.name;
+
+  const dims = document.createElement('span');
+  dims.className = 'card-dims';
+  dims.textContent = `${imgData.naturalWidth}×${imgData.naturalHeight}px`;
+
+  header.appendChild(fname);
+  header.appendChild(dims);
+
+  if (!is16x9(imgData.naturalWidth, imgData.naturalHeight)) {
+    const warn = document.createElement('span');
+    warn.className = 'card-warning';
+    warn.textContent = 'Not 16:9';
+    header.appendChild(warn);
+  }
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'card-remove';
+  removeBtn.textContent = '✕';
+  removeBtn.onclick = () => { images.splice(idx, 1); renderAll(); };
+  header.appendChild(removeBtn);
+  card.appendChild(header);
+
+  // Preview
+  const previewWrap = document.createElement('div');
+  previewWrap.className = 'preview-wrap';
+  const previewImg = document.createElement('img');
+  previewImg.src = imgData.dataUrl;
+  previewImg.id = `preview-img-${idx}`;
+  previewWrap.appendChild(previewImg);
+  card.appendChild(previewWrap);
+
+  // Controls
+  const controls = document.createElement('div');
+  controls.className = 'card-controls';
+
+  // Orientation toggle
+  const oriGroup = document.createElement('div');
+  oriGroup.className = 'btn-group';
+  const oriLabel = document.createElement('label');
+  oriLabel.textContent = 'Orientation';
+  oriGroup.appendChild(oriLabel);
+
+  ['portrait', 'landscape'].forEach(ori => {
+    const btn = document.createElement('button');
+    btn.className = 'btn' + (imgData.orientation === ori ? ' active' : '');
+    btn.textContent = ori.charAt(0).toUpperCase() + ori.slice(1);
+    btn.onclick = () => {
+      if (imgData.orientation === ori) return;
+      imgData.orientation = ori;
+      const newSizes = getSizes(ori);
+      imgData.sizeEnabled = newSizes.map(() => true);
+      imgData.results = null;
+      imgData.manualCropSizeIndex = 0;
+      renderAll();
+    };
+    oriGroup.appendChild(btn);
+  });
+  controls.appendChild(oriGroup);
+
+  // Size toggles
+  const sizeGroup = document.createElement('div');
+  sizeGroup.className = 'btn-group';
+  const sizeLabel = document.createElement('label');
+  sizeLabel.textContent = 'Print Sizes';
+  sizeGroup.appendChild(sizeLabel);
+
+  sizes.forEach((size, si) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn size-btn' + (imgData.sizeEnabled[si] ? ' active' : '');
+    btn.textContent = size.label;
+    btn.onclick = () => {
+      imgData.sizeEnabled[si] = !imgData.sizeEnabled[si];
+      imgData.results = null;
+      renderAll();
+    };
+    sizeGroup.appendChild(btn);
+  });
+  controls.appendChild(sizeGroup);
+
+  // Manual crop toggle + controls
+  const mcRow = document.createElement('div');
+  mcRow.className = 'manual-crop-row';
+
+  const mcBtn = document.createElement('button');
+  mcBtn.className = 'btn' + (imgData.manualCrop ? ' active' : '');
+  mcBtn.textContent = '✂ Manual Crop';
+  mcBtn.onclick = () => {
+    imgData.manualCrop = !imgData.manualCrop;
+    renderAll();
+  };
+  mcRow.appendChild(mcBtn);
+
+  if (imgData.manualCrop) {
+    const sel = document.createElement('select');
+    sizes.forEach((size, si) => {
+      const key = `${imgData.orientation}_${si}`;
+      const hasManual = !!imgData.manualCropPositions[key];
+      const opt = document.createElement('option');
+      opt.value = si;
+      opt.textContent = (hasManual ? '✓ ' : '') + size.label;
+      if (si === imgData.manualCropSizeIndex) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = () => {
+      imgData.manualCropSizeIndex = parseInt(sel.value);
+      renderAll();
+    };
+    mcRow.appendChild(sel);
+  }
+  controls.appendChild(mcRow);
+
+  // Generate button
+  const genBtn = document.createElement('button');
+  genBtn.className = 'btn-generate';
+  const enabledCount = imgData.sizeEnabled.filter(Boolean).length;
+  genBtn.textContent = `Generate Crops (${enabledCount})`;
+  genBtn.disabled = enabledCount === 0;
+  genBtn.onclick = () => generateCrops(imgData, idx);
+  controls.appendChild(genBtn);
+
+  card.appendChild(controls);
+
+  // Results
+  if (imgData.results && imgData.results.length > 0) {
+    const resultsSection = document.createElement('div');
+    resultsSection.className = 'results-section';
+
+    const grid = document.createElement('div');
+    grid.className = 'results-grid';
+
+    imgData.results.forEach(r => {
+      const item = document.createElement('div');
+      item.className = 'result-item';
+
+      const thumb = document.createElement('img');
+      thumb.src = r.dataUrl;
+      item.appendChild(thumb);
+
+      const info = document.createElement('div');
+      info.className = 'result-info';
+
+      const lbl = document.createElement('div');
+      lbl.className = 'result-label';
+      lbl.textContent = r.label;
+      info.appendChild(lbl);
+
+      const rdims = document.createElement('div');
+      rdims.className = 'result-dims';
+      rdims.textContent = `${r.outW}×${r.outH}px`;
+      info.appendChild(rdims);
+
+      const dlBtn = document.createElement('button');
+      dlBtn.className = 'result-dl';
+      dlBtn.textContent = '⬇ Download';
+      dlBtn.onclick = () => downloadSingle(r.dataUrl, r.filename);
+      info.appendChild(dlBtn);
+
+      item.appendChild(info);
+      grid.appendChild(item);
+    });
+
+    resultsSection.appendChild(grid);
+
+    // Download all zip
+    const zipBtn = document.createElement('button');
+    zipBtn.className = 'btn-download-all';
+    zipBtn.textContent = '⬇ Download All (.zip)';
+    zipBtn.onclick = async () => {
+      zipBtn.disabled = true;
+      zipBtn.textContent = '⏳ Zipping…';
+      await downloadZip(imgData);
+      zipBtn.disabled = false;
+      zipBtn.textContent = '⬇ Download All (.zip)';
+    };
+    resultsSection.appendChild(zipBtn);
+
+    card.appendChild(resultsSection);
+  }
+
+  cardsContainer.appendChild(card);
+
+  // Setup crop overlay after card is in DOM
+  if (imgData.manualCrop) {
+    previewImg.onload = () => setupCropOverlay(imgData, idx, previewWrap, previewImg);
+    if (previewImg.complete) setupCropOverlay(imgData, idx, previewWrap, previewImg);
+  }
+}
+
+function setupCropOverlay(imgData, idx, previewWrap, previewImg) {
+  const sizes = getSizes(imgData.orientation);
+  const si = imgData.manualCropSizeIndex;
+  const size = sizes[si];
+  if (!size) return;
+
+  const dispW = previewImg.clientWidth;
+  const dispH = previewImg.clientHeight;
+  const natW = imgData.naturalWidth;
+  const natH = imgData.naturalHeight;
+  const scaleX = dispW / natW;
+  const scaleY = dispH / natH;
+
+  const ratio = getAspectRatio(size);
+  const auto = autoCropRegion(natW, natH, ratio);
+
+  const key = `${imgData.orientation}_${si}`;
+  const pos = imgData.manualCropPositions[key] || { x: auto.x, y: auto.y };
+  const cropW = auto.w;
+  const cropH = auto.h;
+
+  // Clamp
+  pos.x = Math.max(0, Math.min(pos.x, natW - cropW));
+  pos.y = Math.max(0, Math.min(pos.y, natH - cropH));
+
+  const imgRect = previewImg.getBoundingClientRect();
+  const wrapRect = previewWrap.getBoundingClientRect();
+  const offsetX = imgRect.left - wrapRect.left;
+  const offsetY = imgRect.top - wrapRect.top;
+
+  // Remove existing overlay
+  const existing = previewWrap.querySelector('.crop-overlay');
+  if (existing) existing.remove();
+
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'crop-overlay');
+  svg.setAttribute('width', dispW);
+  svg.setAttribute('height', dispH);
+  svg.style.left = offsetX + 'px';
+  svg.style.top = offsetY + 'px';
+  svg.style.position = 'absolute';
+
+  // Mask for dimming
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  const mask = document.createElementNS('http://www.w3.org/2000/svg', 'mask');
+  mask.setAttribute('id', `mask-${idx}`);
+  const maskBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  maskBg.setAttribute('width', '100%');
+  maskBg.setAttribute('height', '100%');
+  maskBg.setAttribute('fill', 'white');
+  const maskHole = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  maskHole.setAttribute('x', pos.x * scaleX);
+  maskHole.setAttribute('y', pos.y * scaleY);
+  maskHole.setAttribute('width', cropW * scaleX);
+  maskHole.setAttribute('height', cropH * scaleY);
+  maskHole.setAttribute('fill', 'black');
+  mask.appendChild(maskBg);
+  mask.appendChild(maskHole);
+  defs.appendChild(mask);
+  svg.appendChild(defs);
+
+  // Dim overlay
+  const dimRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  dimRect.setAttribute('width', '100%');
+  dimRect.setAttribute('height', '100%');
+  dimRect.setAttribute('fill', 'rgba(0,0,0,0.55)');
+  dimRect.setAttribute('mask', `url(#mask-${idx})`);
+  svg.appendChild(dimRect);
+
+  // Crop border
+  const border = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  border.setAttribute('class', 'crop-border');
+  border.setAttribute('x', pos.x * scaleX);
+  border.setAttribute('y', pos.y * scaleY);
+  border.setAttribute('width', cropW * scaleX);
+  border.setAttribute('height', cropH * scaleY);
+  svg.appendChild(border);
+
+  // Drag handle (invisible rect)
+  const handle = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  handle.setAttribute('class', 'crop-rect');
+  handle.setAttribute('x', pos.x * scaleX);
+  handle.setAttribute('y', pos.y * scaleY);
+  handle.setAttribute('width', cropW * scaleX);
+  handle.setAttribute('height', cropH * scaleY);
+  handle.setAttribute('fill', 'transparent');
+  svg.appendChild(handle);
+
+  previewWrap.appendChild(svg);
+
+  // Drag logic
+  let dragging = false;
+  let startPx, startPy, startCx, startCy;
+
+  handle.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    dragging = true;
+    startPx = e.clientX;
+    startPy = e.clientY;
+    startCx = pos.x;
+    startCy = pos.y;
+  });
+
+  const onMove = e => {
+    if (!dragging) return;
+    const dx = (e.clientX - startPx) / scaleX;
+    const dy = (e.clientY - startPy) / scaleY;
+    pos.x = Math.max(0, Math.min(Math.round(startCx + dx), natW - cropW));
+    pos.y = Math.max(0, Math.min(Math.round(startCy + dy), natH - cropH));
+
+    const sx = pos.x * scaleX;
+    const sy = pos.y * scaleY;
+    maskHole.setAttribute('x', sx);
+    maskHole.setAttribute('y', sy);
+    border.setAttribute('x', sx);
+    border.setAttribute('y', sy);
+    handle.setAttribute('x', sx);
+    handle.setAttribute('y', sy);
+  };
+
+  const onUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    imgData.manualCropPositions[key] = { x: pos.x, y: pos.y };
+  };
+
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+
+  // Cleanup when card is removed
+  const observer = new MutationObserver(() => {
+    if (!document.contains(svg)) {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      observer.disconnect();
+    }
+  });
+  observer.observe(cardsContainer, { childList: true, subtree: true });
+}
+
+function generateCrops(imgData, idx) {
+  const sizes = getSizes(imgData.orientation);
+  const results = [];
+  const prefix = getPrefix(imgData);
+
+  const sourceImg = new Image();
+  sourceImg.onload = () => {
+    sizes.forEach((size, si) => {
+      if (!imgData.sizeEnabled[si]) return;
+
+      const outW = Math.round(size.w * DPI);
+      const outH = Math.round(size.h * DPI);
+      const ratio = size.w / size.h;
+      const auto = autoCropRegion(imgData.naturalWidth, imgData.naturalHeight, ratio);
+
+      const key = `${imgData.orientation}_${si}`;
+      const manualPos = imgData.manualCropPositions[key];
+      let cx, cy;
+      if (manualPos) {
+        cx = manualPos.x;
+        cy = manualPos.y;
+      } else {
+        cx = auto.x;
+        cy = auto.y;
+      }
+      const cw = auto.w;
+      const ch = auto.h;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(sourceImg, cx, cy, cw, ch, 0, 0, outW, outH);
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+      const filename = `${prefix}_${size.label}.jpg`;
+
+      results.push({ label: size.label, outW, outH, dataUrl, filename });
+    });
+
+    imgData.results = results;
+    renderAll();
+  };
+  sourceImg.src = imgData.dataUrl;
+}
+
+function downloadSingle(dataUrl, filename) {
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+async function downloadZip(imgData) {
+  const prefix = getPrefix(imgData);
+  const zip = new JSZip();
+  const folder = zip.folder(prefix);
+
+  for (const r of imgData.results) {
+    const base64 = r.dataUrl.split(',')[1];
+    folder.file(r.filename, base64, { base64: true });
+  }
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${prefix}_crops.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Initial render
+renderAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Etsy Digital Art Mockup Template — SaltyMntDigital</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root { --art-aspect: 2 / 3; }
+  body { -webkit-font-smoothing: antialiased; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+  /* ---------- Frame ---------- */
+  .frame-wrap { position: absolute; transform-origin: center center; }
+  .frame {
+    position: relative;
+    background: linear-gradient(145deg, #1a1a1a, #2a2a2a);
+    padding: 4%;
+    border-radius: 2px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.04) inset,
+      0 22px 36px -18px rgba(0,0,0,0.45),
+      0 8px 16px -8px rgba(0,0,0,0.25);
+  }
+  .frame-wood    { background: linear-gradient(145deg, #6b4a2b, #8a6238); }
+  .frame-white   { background: linear-gradient(145deg, #f5f3ee, #e6e1d6); box-shadow: 0 22px 36px -18px rgba(0,0,0,0.25), 0 8px 16px -8px rgba(0,0,0,0.15); }
+  .frame-thin    { padding: 1.5%; }
+  .frame-gold    { background: linear-gradient(145deg, #c9a24a, #b08531); }
+  .frame-none    { padding: 0; background: transparent; box-shadow: 0 14px 22px -14px rgba(0,0,0,0.35); }
+
+  .mat        { background: #fafaf7; padding: 8%; }
+  .mat-wide   { padding: 14%; }
+  .mat-narrow { padding: 4%; }
+  .mat-cream  { background: #f6f1e6; }
+  .mat-none   { padding: 0; background: transparent; }
+
+  .art-window {
+    aspect-ratio: var(--art-aspect);
+    width: 100%;
+    background: #f4f1ec;
+    overflow: hidden;
+    display: block;
+    position: relative;
+    /* Inset shadow gives the artwork a sense of depth inside the mat */
+    box-shadow:
+      inset 0 0 0 1px rgba(0,0,0,0.04),
+      inset 0 8px 14px -8px rgba(0,0,0,0.35),
+      inset 0 -2px 6px -2px rgba(0,0,0,0.18);
+  }
+  .art-window img { width: 100%; height: 100%; display: block; }
+  .fit-cover img   { object-fit: cover;   object-position: center; }
+  .fit-contain img { object-fit: contain; object-position: center; background: #fff; }
+
+  /* ---------- Custom (uploaded) frame PNG ---------- */
+  /* When a frame PNG is supplied, the frame img sits on top and the artwork
+     shows through the transparent center. Insets define where the opening is. */
+  .frame-custom { position: relative; width: 100%; }
+  .frame-custom .frame-png {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: contain;
+    object-position: center;
+    pointer-events: none;
+    user-select: none;
+    z-index: 2;
+  }
+  .frame-custom .custom-art {
+    position: absolute;
+    /* insets set inline per scene */
+    z-index: 1;
+    overflow: hidden;
+  }
+  .frame-custom .custom-art img {
+    width: 100%; height: 100%; display: block;
+  }
+  .frame-custom.fit-cover   .custom-art img { object-fit: cover;   object-position: center; }
+  .frame-custom.fit-contain .custom-art img { object-fit: contain; object-position: center; background: #fff; }
+  /* The wrap needs an aspect ratio when in custom mode so the PNG sizes itself.
+     We use the native aspect of the uploaded PNG via JS (sets aspect-ratio inline). */
+
+  /* ---------- Scene canvas ---------- */
+  .scene {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    background: #f7f5f1;
+  }
+  .scene-bg {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    object-position: center;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  /* ---------- CSS fallback scenes (when no photo uploaded) ---------- */
+  .wall-warm    { background: radial-gradient(ellipse at 30% 20%, #f0e6d8, #d8c9b3 75%); }
+  .wall-sage    { background: radial-gradient(ellipse at 50% 30%, #d9e0d2, #b9c4a9 80%); }
+  .wall-blush   { background: radial-gradient(ellipse at 50% 30%, #f4e3df, #ddc4bd 80%); }
+  .wall-greige  { background: radial-gradient(ellipse at 50% 25%, #ebe5db, #c8c0b3 80%); }
+  .wall-charcoal{ background: radial-gradient(ellipse at 50% 25%, #3a3a3a, #1f1f1f 90%); }
+  .wall-clean   { background: #f7f5f1; }
+
+  /* ---------- Edit mode chrome ---------- */
+  .scene.editing .frame-wrap {
+    outline: 2px dashed #2563eb;
+    outline-offset: 4px;
+    cursor: move;
+  }
+  .scene.editing .handle {
+    position: absolute;
+    width: 14px; height: 14px;
+    background: #2563eb;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    z-index: 5;
+  }
+  .handle.handle-resize { right: -8px; bottom: -8px; cursor: nwse-resize; }
+  .handle.handle-rotate { left: 50%; top: -28px; transform: translateX(-50%); cursor: grab; background: #16a34a; }
+  .handle { display: none; }
+  .scene.editing .handle { display: block; }
+
+  /* Hide control affordances during html2canvas capture */
+  .capturing .handle, .capturing .frame-wrap { outline: none !important; }
+  .capturing .handle { display: none !important; }
+
+  .dropzone.drag { border-color: #0f172a; background: #f8fafc; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  details > summary { cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+</style>
+</head>
+<body class="bg-stone-100 text-stone-900">
+
+<header class="bg-white border-b border-stone-200">
+  <div class="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="text-2xl">🖼️</span>
+      <div>
+        <h1 class="text-base font-bold leading-none">Etsy Digital Art Mockup Template</h1>
+        <p class="text-xs text-stone-500 mt-1">Drop artwork → photo-realistic mockups → download for your listing</p>
+      </div>
+    </div>
+    <span class="text-xs text-stone-400">SaltyMntDigital</span>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-6 py-8">
+
+  <!-- HOW IT WORKS -->
+  <details class="mb-6 bg-white border border-stone-200 rounded-2xl shadow-sm" open>
+    <summary class="px-5 py-4 flex items-center justify-between text-sm font-semibold">
+      <span>How to set this up (one-time)</span>
+      <span class="text-stone-400 text-xs">Click to collapse</span>
+    </summary>
+    <div class="px-5 pb-5 text-sm text-stone-600 space-y-2">
+      <ol class="list-decimal pl-5 space-y-1">
+        <li>
+          <strong>Scene photos.</strong> Grab a few empty-wall room photos you can use commercially:
+          <a class="text-blue-600 hover:underline" target="_blank" href="https://www.pexels.com/search/empty%20wall/">Pexels</a>,
+          <a class="text-blue-600 hover:underline" target="_blank" href="https://unsplash.com/s/photos/empty-wall">Unsplash</a>,
+          <a class="text-blue-600 hover:underline" target="_blank" href="https://pixabay.com/images/search/empty%20wall/">Pixabay</a>.
+          On each card, click <strong>Upload scene photo</strong>.
+        </li>
+        <li>
+          <strong>Photo-real frames (optional).</strong> If you want true photo frames instead of the built-in styled ones,
+          grab transparent-center frame PNGs:
+          <a class="text-blue-600 hover:underline" target="_blank" href="https://www.pngwing.com/en/search?q=picture+frame+transparent">PNGWing</a>,
+          <a class="text-blue-600 hover:underline" target="_blank" href="https://www.cleanpng.com/free/picture-frame.html">CleanPNG</a>,
+          <a class="text-blue-600 hover:underline" target="_blank" href="https://www.pngegg.com/en/search?q=picture+frame">PNGEgg</a>.
+          On each card, set <strong>Frame</strong> → <strong>✨ Custom photo frame…</strong>, upload the PNG, then dial in the four insets so the artwork fills the opening.
+        </li>
+        <li>Click <strong>Edit placement</strong>, drag the frame onto the wall, resize/rotate, click <strong>Save</strong>.</li>
+        <li>Drop your artwork in the box at top. From now on, just swap artwork and download — placements stick (saved in this browser).</li>
+      </ol>
+      <p class="text-xs text-stone-400 pt-2">Tip: pick scene photos shot straight-on, and frame PNGs with a clean transparent rectangle for the opening.</p>
+    </div>
+  </details>
+
+  <!-- CONTROL PANEL -->
+  <section class="bg-white rounded-2xl border border-stone-200 shadow-sm p-6 mb-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Upload artwork -->
+      <div class="lg:col-span-1">
+        <label class="block text-[11px] font-semibold uppercase tracking-widest text-stone-500 mb-2">Artwork</label>
+        <label id="dropzone" class="dropzone flex flex-col items-center justify-center h-44 border-2 border-dashed border-stone-300 rounded-xl cursor-pointer hover:border-stone-500 transition bg-stone-50">
+          <input id="fileInput" type="file" accept="image/*" class="hidden" />
+          <div id="dzPlaceholder" class="text-center px-4">
+            <div class="text-3xl mb-1">⬆️</div>
+            <div class="text-sm font-medium text-stone-700">Click or drop your artwork</div>
+            <div class="text-xs text-stone-400 mt-1">PNG, JPG, WEBP — any size</div>
+          </div>
+          <img id="dzPreview" class="hidden h-full w-full object-contain p-2" alt="" />
+        </label>
+        <button id="clearBtn" class="mt-2 text-xs text-stone-500 hover:text-stone-800 hidden">Remove image</button>
+      </div>
+
+      <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-[11px] font-semibold uppercase tracking-widest text-stone-500 mb-2">Artwork aspect ratio</label>
+          <div class="grid grid-cols-3 gap-2" id="aspectGroup"></div>
+          <p class="text-xs text-stone-400 mt-2">
+            Pick the ratio your file was designed at. Frames match it automatically — no off-center crops.
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-semibold uppercase tracking-widest text-stone-500 mb-2">Default fit</label>
+          <div class="flex gap-1 bg-stone-100 rounded-lg p-1 w-fit" id="fitGroup">
+            <button data-fit="contain" class="fit-btn px-4 py-1.5 rounded-md text-sm font-medium bg-white shadow-sm">Contain</button>
+            <button data-fit="cover"   class="fit-btn px-4 py-1.5 rounded-md text-sm font-medium text-stone-500">Cover</button>
+          </div>
+          <p class="text-xs text-stone-400 mt-2">
+            <strong>Contain</strong> = full art visible (best for digital prints). <strong>Cover</strong> = fills frame, may crop.
+          </p>
+
+          <div class="mt-5 flex flex-wrap gap-2">
+            <button id="downloadAllBtn" class="inline-flex items-center gap-2 px-4 py-2 bg-stone-900 text-white text-sm font-semibold rounded-lg hover:bg-stone-800 disabled:opacity-40" disabled>
+              ⬇️ Download all
+            </button>
+            <button id="resetSetupBtn" class="inline-flex items-center gap-2 px-4 py-2 border border-stone-300 text-stone-700 text-sm font-semibold rounded-lg hover:bg-stone-50">
+              Reset saved placements
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MOCKUPS -->
+  <section id="mockups" class="grid grid-cols-1 md:grid-cols-2 gap-6"></section>
+
+</main>
+
+<script>
+(function () {
+
+  // ---------- Aspect ratios ----------
+  const ASPECTS = [
+    { value: '2 / 3',     label: '2:3',  hint: 'most common' },
+    { value: '3 / 4',     label: '3:4',  hint: '' },
+    { value: '4 / 5',     label: '4:5',  hint: '' },
+    { value: '5 / 7',     label: '5:7',  hint: '' },
+    { value: '1 / 1',     label: '1:1',  hint: 'square' },
+    { value: '1 / 1.4142',label: 'ISO',  hint: 'A-series' },
+    { value: '3 / 2',     label: '3:2',  hint: 'landscape' },
+    { value: '4 / 3',     label: '4:3',  hint: 'landscape' },
+    { value: '16 / 9',    label: '16:9', hint: 'landscape' },
+  ];
+  const aspectGroup = document.getElementById('aspectGroup');
+  let activeAspect = '2 / 3';
+  ASPECTS.forEach(a => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.value = a.value;
+    btn.className = 'aspect-btn text-xs px-2 py-2 rounded-md border border-stone-200 hover:border-stone-400 transition text-center';
+    btn.innerHTML = `<div class="font-semibold">${a.label}</div>${a.hint ? `<div class="text-[10px] text-stone-400">${a.hint}</div>` : ''}`;
+    btn.addEventListener('click', () => setAspect(a.value));
+    aspectGroup.appendChild(btn);
+  });
+  function setAspect(value) {
+    activeAspect = value;
+    document.documentElement.style.setProperty('--art-aspect', value);
+    document.querySelectorAll('.aspect-btn').forEach(b => {
+      const on = b.dataset.value === value;
+      b.classList.toggle('bg-stone-900', on);
+      b.classList.toggle('text-white', on);
+      b.classList.toggle('border-stone-900', on);
+    });
+  }
+
+  // ---------- Default scenes ----------
+  // Each scene defines its CSS fallback wall + a default frame placement (% of scene).
+  const DEFAULT_SCENES = [
+    { id: 'hero',     name: 'Hero — Warm Wall',      wallClass: 'wall-warm',     frame: 'frame',         mat: 'mat',         placement: { x: 50, y: 50, w: 38, rot: 0 } },
+    { id: 'couch',    name: 'Above the Couch',       wallClass: 'wall-greige',   frame: 'frame frame-white', mat: 'mat mat-wide', placement: { x: 50, y: 36, w: 32, rot: 0 } },
+    { id: 'console',  name: 'Console Table',         wallClass: 'wall-blush',    frame: 'frame frame-wood', mat: 'mat mat-cream mat-narrow', placement: { x: 35, y: 42, w: 26, rot: 0 } },
+    { id: 'gallery',  name: 'Gallery — Single',      wallClass: 'wall-sage',     frame: 'frame frame-thin', mat: 'mat mat-narrow', placement: { x: 50, y: 50, w: 30, rot: 0 } },
+    { id: 'gold',     name: 'Gold on Charcoal',      wallClass: 'wall-charcoal', frame: 'frame frame-gold', mat: 'mat mat-cream mat-narrow', placement: { x: 50, y: 50, w: 36, rot: 0 } },
+    { id: 'product',  name: 'Clean Product Shot',    wallClass: 'wall-clean',    frame: 'frame frame-white', mat: 'mat mat-narrow', placement: { x: 50, y: 50, w: 42, rot: 0 } },
+  ];
+
+  const FRAME_OPTIONS = [
+    { value: 'frame',              label: 'Black' },
+    { value: 'frame frame-white',  label: 'White' },
+    { value: 'frame frame-wood',   label: 'Wood' },
+    { value: 'frame frame-gold',   label: 'Gold' },
+    { value: 'frame frame-thin',   label: 'Thin black' },
+    { value: 'frame frame-none',   label: 'No frame' },
+    { value: '__custom__',         label: '✨ Custom photo frame…' },
+  ];
+  const MAT_OPTIONS = [
+    { value: 'mat',                       label: 'Standard' },
+    { value: 'mat mat-narrow',            label: 'Narrow' },
+    { value: 'mat mat-wide',              label: 'Wide' },
+    { value: 'mat mat-cream',             label: 'Cream' },
+    { value: 'mat mat-cream mat-narrow',  label: 'Cream narrow' },
+    { value: 'mat-none',                  label: 'No mat' },
+  ];
+
+  // ---------- Persistence ----------
+  const LS_KEY = 'etsy-mockup-template-v2';
+  function loadConfig() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }
+    catch { return {}; }
+  }
+  function saveConfig(cfg) { localStorage.setItem(LS_KEY, JSON.stringify(cfg)); }
+  let config = loadConfig();   // { sceneId: { bg: dataUrl, frame, mat, placement } }
+
+  // ---------- State ----------
+  let currentArt = null;
+  const downloadAllBtn = document.getElementById('downloadAllBtn');
+
+  // ---------- Build mockup cards ----------
+  const mockupsRoot = document.getElementById('mockups');
+  DEFAULT_SCENES.forEach(scene => mockupsRoot.appendChild(buildMockup(scene)));
+
+  function buildMockup(scene) {
+    const saved = config[scene.id] || {};
+    const placement = saved.placement || scene.placement;
+    const frameClass = saved.frame || scene.frame;
+    const matClass   = saved.mat   || scene.mat;
+    const bg         = saved.bg    || null;
+    const fitMode    = saved.fit   || 'contain';
+
+    const article = document.createElement('article');
+    article.className = 'mockup bg-white rounded-2xl border border-stone-200 overflow-hidden shadow-sm';
+    article.dataset.id = scene.id;
+
+    const customFrame = saved.customFrame || null; // { src, insets:{t,r,b,l}, aspect }
+    const isCustom = frameClass === '__custom__' && customFrame?.src;
+
+    article.innerHTML = `
+      <div class="capture scene ${scene.wallClass}" data-bg="${bg ? '1' : '0'}">
+        ${bg ? `<img class="scene-bg" src="${bg}" alt="" />` : ''}
+        <div class="frame-wrap" style="left:${placement.x}%; top:${placement.y}%; width:${placement.w}%; transform: translate(-50%, -50%) rotate(${placement.rot}deg); ${isCustom ? `aspect-ratio:${customFrame.aspect};` : ''}">
+          <div class="frame-builtin ${isCustom ? 'hidden' : ''}">
+            <div class="frame-el ${frameClass === '__custom__' ? 'frame' : frameClass}">
+              <div class="mat-el ${matClass}">
+                <div class="art-window fit-${fitMode}"><img class="art" alt="" /></div>
+              </div>
+            </div>
+          </div>
+          <div class="frame-custom ${isCustom ? '' : 'hidden'} fit-${fitMode}">
+            <div class="custom-art" style="top:${customFrame?.insets?.t ?? 12}%; right:${customFrame?.insets?.r ?? 12}%; bottom:${customFrame?.insets?.b ?? 12}%; left:${customFrame?.insets?.l ?? 12}%;">
+              <img class="art" alt="" />
+            </div>
+            ${customFrame?.src ? `<img class="frame-png" src="${customFrame.src}" alt="" />` : ''}
+          </div>
+          <div class="handle handle-resize"></div>
+          <div class="handle handle-rotate"></div>
+        </div>
+      </div>
+      <div class="px-4 py-3">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-sm font-semibold">${scene.name}</div>
+          <div class="flex items-center gap-2">
+            <button class="edit-btn text-xs px-3 py-1.5 rounded-md border border-stone-200 hover:bg-stone-50">Edit placement</button>
+            <button class="dl-btn text-xs px-3 py-1.5 rounded-md border border-stone-200 hover:bg-stone-50">Download</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <label class="block">
+            <span class="text-[10px] uppercase tracking-wider text-stone-400">Frame</span>
+            <select class="frame-select w-full border border-stone-200 rounded px-2 py-1 mt-0.5">
+              ${FRAME_OPTIONS.map(o => `<option value="${o.value}" ${o.value === frameClass ? 'selected' : ''}>${o.label}</option>`).join('')}
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-[10px] uppercase tracking-wider text-stone-400">Mat</span>
+            <select class="mat-select w-full border border-stone-200 rounded px-2 py-1 mt-0.5">
+              ${MAT_OPTIONS.map(o => `<option value="${o.value}" ${o.value === matClass ? 'selected' : ''}>${o.label}</option>`).join('')}
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-[10px] uppercase tracking-wider text-stone-400">Fit</span>
+            <select class="fit-select w-full border border-stone-200 rounded px-2 py-1 mt-0.5">
+              <option value="contain" ${fitMode==='contain'?'selected':''}>Contain</option>
+              <option value="cover"   ${fitMode==='cover'?'selected':''}>Cover</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-[10px] uppercase tracking-wider text-stone-400">Scene photo</span>
+            <button class="bg-btn w-full border border-stone-200 rounded px-2 py-1 mt-0.5 hover:bg-stone-50 text-left truncate">
+              ${bg ? 'Replace photo' : 'Upload photo'}
+            </button>
+            <input type="file" accept="image/*" class="bg-input hidden" />
+          </label>
+        </div>
+        <div class="edit-controls hidden mt-3 grid grid-cols-4 gap-2 text-xs">
+          <label class="block">
+            <span class="text-[10px] uppercase tracking-wider text-stone-400">X %</span>
+            <input type="number" step="0.5" class="x-input w-full border border-stone-200 rounded px-2 py-1 mt-0.5" value="${placement.x}" />
+          </label>
+          <label class="block">
+            <span class="text-[10px] uppercase tracking-wider text-stone-400">Y %</span>
+            <input type="number" step="0.5" class="y-input w-full border border-stone-200 rounded px-2 py-1 mt-0.5" value="${placement.y}" />
+          </label>
+          <label class="block">
+            <span class="text-[10px] uppercase tracking-wider text-stone-400">Width %</span>
+            <input type="number" step="0.5" class="w-input w-full border border-stone-200 rounded px-2 py-1 mt-0.5" value="${placement.w}" />
+          </label>
+          <label class="block">
+            <span class="text-[10px] uppercase tracking-wider text-stone-400">Rotate °</span>
+            <input type="number" step="0.5" class="r-input w-full border border-stone-200 rounded px-2 py-1 mt-0.5" value="${placement.rot}" />
+          </label>
+        </div>
+        <div class="custom-controls ${isCustom ? '' : 'hidden'} mt-3 p-3 bg-amber-50 border border-amber-200 rounded text-xs">
+          <div class="flex items-center justify-between mb-2">
+            <span class="font-semibold text-amber-900">Custom photo frame</span>
+            <button class="frame-png-btn px-2 py-1 rounded border border-amber-300 bg-white hover:bg-amber-100">
+              ${customFrame?.src ? 'Replace frame PNG' : 'Upload frame PNG'}
+            </button>
+            <input type="file" accept="image/png,image/webp,image/jpeg" class="frame-png-input hidden" />
+          </div>
+          <p class="text-[11px] text-amber-800 mb-2">
+            Upload a frame photo with a transparent center (PNG with alpha works best). Then dial in the four insets so the artwork fills the opening.
+          </p>
+          <div class="grid grid-cols-4 gap-2">
+            <label class="block">
+              <span class="text-[10px] uppercase tracking-wider text-amber-700">Top %</span>
+              <input type="number" step="0.5" class="inset-t w-full border border-amber-200 rounded px-2 py-1 mt-0.5" value="${customFrame?.insets?.t ?? 12}" />
+            </label>
+            <label class="block">
+              <span class="text-[10px] uppercase tracking-wider text-amber-700">Right %</span>
+              <input type="number" step="0.5" class="inset-r w-full border border-amber-200 rounded px-2 py-1 mt-0.5" value="${customFrame?.insets?.r ?? 12}" />
+            </label>
+            <label class="block">
+              <span class="text-[10px] uppercase tracking-wider text-amber-700">Bottom %</span>
+              <input type="number" step="0.5" class="inset-b w-full border border-amber-200 rounded px-2 py-1 mt-0.5" value="${customFrame?.insets?.b ?? 12}" />
+            </label>
+            <label class="block">
+              <span class="text-[10px] uppercase tracking-wider text-amber-700">Left %</span>
+              <input type="number" step="0.5" class="inset-l w-full border border-amber-200 rounded px-2 py-1 mt-0.5" value="${customFrame?.insets?.l ?? 12}" />
+            </label>
+          </div>
+        </div>
+        <div class="edit-actions hidden mt-2 flex justify-end gap-2 text-xs">
+          <button class="cancel-btn px-3 py-1 rounded border border-stone-200 hover:bg-stone-50">Cancel</button>
+          <button class="save-btn px-3 py-1 rounded bg-stone-900 text-white hover:bg-stone-800">Save</button>
+        </div>
+      </div>
+    `;
+
+    wireMockup(article, scene);
+    return article;
+  }
+
+  // ---------- Mockup behavior ----------
+  function wireMockup(article, scene) {
+    const sceneEl   = article.querySelector('.scene');
+    const wrap      = article.querySelector('.frame-wrap');
+    const frameEl   = article.querySelector('.frame-el');
+    const matEl     = article.querySelector('.mat-el');
+    const artWindow = article.querySelector('.art-window');
+    const editBtn   = article.querySelector('.edit-btn');
+    const dlBtn     = article.querySelector('.dl-btn');
+    const editControls = article.querySelector('.edit-controls');
+    const editActions  = article.querySelector('.edit-actions');
+    const xInput = article.querySelector('.x-input');
+    const yInput = article.querySelector('.y-input');
+    const wInput = article.querySelector('.w-input');
+    const rInput = article.querySelector('.r-input');
+    const saveBtn = article.querySelector('.save-btn');
+    const cancelBtn = article.querySelector('.cancel-btn');
+    const frameSel = article.querySelector('.frame-select');
+    const matSel   = article.querySelector('.mat-select');
+    const fitSel   = article.querySelector('.fit-select');
+    const bgBtn    = article.querySelector('.bg-btn');
+    const bgInput  = article.querySelector('.bg-input');
+
+    let placement = { ...(config[scene.id]?.placement || scene.placement) };
+    let backup = null;
+
+    function applyPlacement() {
+      wrap.style.left  = placement.x + '%';
+      wrap.style.top   = placement.y + '%';
+      wrap.style.width = placement.w + '%';
+      wrap.style.transform = `translate(-50%, -50%) rotate(${placement.rot}deg)`;
+      xInput.value = placement.x.toFixed(1);
+      yInput.value = placement.y.toFixed(1);
+      wInput.value = placement.w.toFixed(1);
+      rInput.value = placement.rot.toFixed(1);
+    }
+
+    function persist(extra = {}) {
+      config[scene.id] = {
+        ...(config[scene.id] || {}),
+        placement: { ...placement },
+        frame: frameSel.value,
+        mat: matSel.value,
+        fit: fitSel.value,
+        ...extra,
+      };
+      saveConfig(config);
+    }
+
+    const builtinWrap   = article.querySelector('.frame-builtin');
+    const customWrap    = article.querySelector('.frame-custom');
+    const customControls = article.querySelector('.custom-controls');
+    const framePngBtn   = article.querySelector('.frame-png-btn');
+    const framePngInput = article.querySelector('.frame-png-input');
+    const customArt     = article.querySelector('.custom-art');
+    const insetT = article.querySelector('.inset-t');
+    const insetR = article.querySelector('.inset-r');
+    const insetB = article.querySelector('.inset-b');
+    const insetL = article.querySelector('.inset-l');
+
+    let customFrameState = config[scene.id]?.customFrame || null; // {src, insets, aspect}
+
+    function applyFrameMode() {
+      const isCustomNow = frameSel.value === '__custom__';
+      customControls.classList.toggle('hidden', !isCustomNow);
+
+      if (isCustomNow && customFrameState?.src) {
+        // Show custom layer, hide builtin
+        builtinWrap.classList.add('hidden');
+        customWrap.classList.remove('hidden');
+        // Set the wrap aspect ratio to match the frame PNG so width drives height
+        wrap.style.aspectRatio = customFrameState.aspect || '4 / 5';
+        applyInsets();
+        // Ensure frame PNG element exists
+        let pngImg = customWrap.querySelector('.frame-png');
+        if (!pngImg) {
+          pngImg = document.createElement('img');
+          pngImg.className = 'frame-png';
+          pngImg.alt = '';
+          customWrap.appendChild(pngImg);
+        }
+        pngImg.src = customFrameState.src;
+        // Mirror the art src
+        const customImg = customArt.querySelector('img.art');
+        if (currentArt) customImg.src = currentArt;
+      } else {
+        // Builtin path: hide custom, show builtin, clear wrap aspect
+        customWrap.classList.add('hidden');
+        builtinWrap.classList.remove('hidden');
+        wrap.style.aspectRatio = '';
+      }
+    }
+
+    function applyInsets() {
+      const t = parseFloat(insetT.value) || 0;
+      const r = parseFloat(insetR.value) || 0;
+      const b = parseFloat(insetB.value) || 0;
+      const l = parseFloat(insetL.value) || 0;
+      customArt.style.top    = t + '%';
+      customArt.style.right  = r + '%';
+      customArt.style.bottom = b + '%';
+      customArt.style.left   = l + '%';
+    }
+
+    // --- Frame / mat / fit selects ---
+    frameSel.addEventListener('change', () => {
+      if (frameSel.value === '__custom__') {
+        // If no frame PNG yet, prompt the upload immediately
+        if (!customFrameState?.src) framePngInput.click();
+      } else {
+        frameEl.className = 'frame-el ' + frameSel.value;
+      }
+      applyFrameMode();
+      persist({ customFrame: customFrameState });
+    });
+    matSel.addEventListener('change', () => {
+      matEl.className = 'mat-el ' + matSel.value;
+      persist();
+    });
+    fitSel.addEventListener('change', () => {
+      artWindow.classList.remove('fit-cover','fit-contain');
+      artWindow.classList.add('fit-' + fitSel.value);
+      customWrap.classList.remove('fit-cover','fit-contain');
+      customWrap.classList.add('fit-' + fitSel.value);
+      persist();
+    });
+
+    // --- Custom frame PNG upload + insets ---
+    framePngBtn.addEventListener('click', () => framePngInput.click());
+    framePngInput.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const dataUrl = ev.target.result;
+        // Probe natural dimensions to set the wrap aspect-ratio
+        const probe = new Image();
+        probe.onload = () => {
+          const aspect = `${probe.naturalWidth} / ${probe.naturalHeight}`;
+          customFrameState = {
+            src: dataUrl,
+            insets: customFrameState?.insets || { t: 12, r: 12, b: 12, l: 12 },
+            aspect,
+          };
+          framePngBtn.textContent = 'Replace frame PNG';
+          // Force frame select to custom mode
+          frameSel.value = '__custom__';
+          applyFrameMode();
+          persist({ customFrame: customFrameState });
+        };
+        probe.src = dataUrl;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    [insetT, insetR, insetB, insetL].forEach((inp, i) => {
+      const key = ['t','r','b','l'][i];
+      inp.addEventListener('input', () => {
+        if (!customFrameState) customFrameState = { src: null, insets: { t:12,r:12,b:12,l:12 }, aspect: '4 / 5' };
+        customFrameState.insets[key] = parseFloat(inp.value) || 0;
+        applyInsets();
+        persist({ customFrame: customFrameState });
+      });
+    });
+
+    // --- Scene photo upload ---
+    bgBtn.addEventListener('click', () => bgInput.click());
+    bgInput.addEventListener('change', e => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const dataUrl = ev.target.result;
+        let bgImg = sceneEl.querySelector('.scene-bg');
+        if (!bgImg) {
+          bgImg = document.createElement('img');
+          bgImg.className = 'scene-bg';
+          bgImg.alt = '';
+          sceneEl.insertBefore(bgImg, sceneEl.firstChild);
+        }
+        bgImg.src = dataUrl;
+        sceneEl.dataset.bg = '1';
+        bgBtn.textContent = 'Replace photo';
+        persist({ bg: dataUrl });
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // --- Edit mode ---
+    function enterEdit() {
+      backup = { ...placement };
+      sceneEl.classList.add('editing');
+      editControls.classList.remove('hidden');
+      editActions.classList.remove('hidden');
+      editBtn.textContent = 'Editing…';
+      editBtn.disabled = true;
+    }
+    function exitEdit() {
+      sceneEl.classList.remove('editing');
+      editControls.classList.add('hidden');
+      editActions.classList.add('hidden');
+      editBtn.textContent = 'Edit placement';
+      editBtn.disabled = false;
+    }
+    editBtn.addEventListener('click', enterEdit);
+    cancelBtn.addEventListener('click', () => {
+      placement = { ...backup };
+      applyPlacement();
+      exitEdit();
+    });
+    saveBtn.addEventListener('click', () => {
+      persist();
+      exitEdit();
+    });
+
+    [xInput,yInput,wInput,rInput].forEach((inp, i) => {
+      const key = ['x','y','w','rot'][i];
+      inp.addEventListener('input', () => {
+        const v = parseFloat(inp.value);
+        if (!Number.isFinite(v)) return;
+        placement[key] = v;
+        applyPlacement();
+      });
+    });
+
+    // --- Drag to move ---
+    let dragging = null;
+    wrap.addEventListener('pointerdown', e => {
+      if (!sceneEl.classList.contains('editing')) return;
+      if (e.target.classList.contains('handle')) return; // resize/rotate handle handles itself
+      const rect = sceneEl.getBoundingClientRect();
+      dragging = {
+        type: 'move',
+        startX: e.clientX, startY: e.clientY,
+        origX: placement.x, origY: placement.y,
+        rect,
+      };
+      wrap.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+
+    // --- Resize handle ---
+    const resizeHandle = article.querySelector('.handle-resize');
+    resizeHandle.addEventListener('pointerdown', e => {
+      if (!sceneEl.classList.contains('editing')) return;
+      const rect = sceneEl.getBoundingClientRect();
+      dragging = {
+        type: 'resize',
+        startX: e.clientX,
+        origW: placement.w,
+        rect,
+      };
+      resizeHandle.setPointerCapture(e.pointerId);
+      e.preventDefault(); e.stopPropagation();
+    });
+
+    // --- Rotate handle ---
+    const rotateHandle = article.querySelector('.handle-rotate');
+    rotateHandle.addEventListener('pointerdown', e => {
+      if (!sceneEl.classList.contains('editing')) return;
+      const rect = wrap.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      dragging = {
+        type: 'rotate',
+        cx, cy,
+        startAngle: Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI,
+        origRot: placement.rot,
+      };
+      rotateHandle.setPointerCapture(e.pointerId);
+      e.preventDefault(); e.stopPropagation();
+    });
+
+    document.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      if (dragging.type === 'move') {
+        const dx = (e.clientX - dragging.startX) / dragging.rect.width  * 100;
+        const dy = (e.clientY - dragging.startY) / dragging.rect.height * 100;
+        placement.x = clamp(dragging.origX + dx, 0, 100);
+        placement.y = clamp(dragging.origY + dy, 0, 100);
+      } else if (dragging.type === 'resize') {
+        const dx = (e.clientX - dragging.startX) / dragging.rect.width * 100;
+        placement.w = clamp(dragging.origW + dx * 2, 5, 95);
+      } else if (dragging.type === 'rotate') {
+        const ang = Math.atan2(e.clientY - dragging.cy, e.clientX - dragging.cx) * 180 / Math.PI;
+        placement.rot = dragging.origRot + (ang - dragging.startAngle);
+      }
+      applyPlacement();
+    });
+    document.addEventListener('pointerup', () => { dragging = null; });
+
+    // --- Download ---
+    dlBtn.addEventListener('click', async () => {
+      if (!currentArt) { alert('Drop an artwork first.'); return; }
+      const wasEditing = sceneEl.classList.contains('editing');
+      if (wasEditing) sceneEl.classList.remove('editing');
+      sceneEl.classList.add('capturing');
+      dlBtn.disabled = true; dlBtn.textContent = 'Rendering…';
+      try {
+        const canvas = await html2canvas(sceneEl, { backgroundColor: null, scale: 2, useCORS: true, logging: false });
+        const link = document.createElement('a');
+        link.download = `${scene.id}.png`;
+        link.href = canvas.toDataURL('image/png');
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      } finally {
+        sceneEl.classList.remove('capturing');
+        if (wasEditing) sceneEl.classList.add('editing');
+        dlBtn.disabled = false; dlBtn.textContent = 'Download';
+      }
+    });
+
+    applyPlacement();
+    applyFrameMode();
+  }
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  // ---------- Default fit toggle ----------
+  document.querySelectorAll('.fit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const fit = btn.dataset.fit;
+      document.querySelectorAll('.fit-btn').forEach(b => {
+        const on = b === btn;
+        b.classList.toggle('bg-white', on);
+        b.classList.toggle('shadow-sm', on);
+        b.classList.toggle('text-stone-500', !on);
+      });
+      document.querySelectorAll('.mockup').forEach(m => {
+        const sel = m.querySelector('.fit-select');
+        sel.value = fit;
+        sel.dispatchEvent(new Event('change'));
+      });
+    });
+  });
+
+  // ---------- Artwork upload ----------
+  const fileInput   = document.getElementById('fileInput');
+  const dropzone    = document.getElementById('dropzone');
+  const dzPlaceholder = document.getElementById('dzPlaceholder');
+  const dzPreview   = document.getElementById('dzPreview');
+  const clearBtn    = document.getElementById('clearBtn');
+
+  function setArt(dataUrl) {
+    currentArt = dataUrl;
+    document.querySelectorAll('img.art').forEach(img => { img.src = dataUrl; });
+    dzPreview.src = dataUrl;
+    dzPreview.classList.remove('hidden');
+    dzPlaceholder.classList.add('hidden');
+    clearBtn.classList.remove('hidden');
+    downloadAllBtn.disabled = false;
+  }
+  function clearArt() {
+    currentArt = null;
+    document.querySelectorAll('img.art').forEach(img => { img.removeAttribute('src'); });
+    dzPreview.classList.add('hidden');
+    dzPlaceholder.classList.remove('hidden');
+    clearBtn.classList.add('hidden');
+    downloadAllBtn.disabled = true;
+  }
+  function handleFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = e => setArt(e.target.result);
+    reader.readAsDataURL(file);
+  }
+  fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+  ['dragenter','dragover'].forEach(ev =>
+    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('drag'); })
+  );
+  ['dragleave','drop'].forEach(ev =>
+    dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('drag'); })
+  );
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  clearBtn.addEventListener('click', e => { e.preventDefault(); clearArt(); fileInput.value=''; });
+
+  // ---------- Download all ----------
+  downloadAllBtn.addEventListener('click', async () => {
+    if (!currentArt) return;
+    downloadAllBtn.disabled = true;
+    const original = downloadAllBtn.textContent;
+    const cards = document.querySelectorAll('.mockup');
+    let i = 0;
+    for (const card of cards) {
+      i++;
+      downloadAllBtn.textContent = `Rendering ${i}/${cards.length}…`;
+      card.querySelector('.dl-btn').click();
+      await new Promise(r => setTimeout(r, 400));
+    }
+    downloadAllBtn.textContent = original;
+    downloadAllBtn.disabled = false;
+  });
+
+  // ---------- Reset ----------
+  document.getElementById('resetSetupBtn').addEventListener('click', () => {
+    if (!confirm('Clear saved scene photos and frame placements? Your artwork stays.')) return;
+    localStorage.removeItem(LS_KEY);
+    location.reload();
+  });
+
+  // Init aspect last so it applies after DOM exists
+  setAspect(activeAspect);
+})();
+</script>
+</body>
+</html>
