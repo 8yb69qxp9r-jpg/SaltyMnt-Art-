@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Salty Mountain — Pinterest Pin Templates</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #f0eee9; font-family: 'Inter', sans-serif; }
+  #root { width: 100vw; height: 100vh; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="image-slot.js"></script>
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="pins.jsx"></script>
+
+<script type="text/babel">
+const PINS = [
+  { id: 'pin-01', label: '01 · Hero — single peak full-bleed', Comp: Pin01_Hero, archetype: 'hero' },
+  { id: 'pin-02', label: '02 · Lifestyle — in-room mockup', Comp: Pin02_Lifestyle, archetype: 'editorial' },
+  { id: 'pin-03', label: '03 · Triptych — 3-print gallery set', Comp: Pin03_Triptych, archetype: 'set' },
+  { id: 'pin-04', label: '04 · 6-Print Grid — Sawatch collection', Comp: Pin04_SixGrid, archetype: 'set' },
+  { id: 'pin-05', label: '05 · Before/After — color → B&W', Comp: Pin05_BeforeAfter, archetype: 'editorial' },
+  { id: 'pin-06', label: '06 · Editorial — typographic peak name', Comp: Pin06_Editorial, archetype: 'editorial' },
+  { id: 'pin-07', label: '07 · Map Locator — CO outline + dot', Comp: Pin07_MapLocator, archetype: 'editorial' },
+  { id: 'pin-08', label: '08 · Elevation Hook — 14,433 ft', Comp: Pin08_Elevation, archetype: 'hero' },
+  { id: 'pin-09', label: '09 · Carousel Tease — 6-peak swipe', Comp: Pin09_Carousel, archetype: 'set' },
+  { id: 'pin-10', label: '10 · Honesty — AI-rendered manifesto', Comp: Pin10_Honesty, archetype: 'editorial' },
+];
+
+const ART_W = 360;
+const ART_H = ART_W * (PIN_H / PIN_W); // 540
+const SCALE = ART_W / PIN_W;
+
+function App() {
+  return (
+    <DesignCanvas>
+      <DCSection
+        id="intro"
+        title="Salty Mountain — Pinterest Pin Templates"
+        subtitle="10 templates · 1000×1500 (2:3 Pinterest-optimal) · designed for engagement + Etsy click-through"
+      >
+        <DCArtboard id="brief" label="Strategy notes" width={520} height={ART_H}>
+          <div style={{
+            padding: 32,
+            fontFamily: '"Inter", sans-serif',
+            fontSize: 13, lineHeight: 1.55, color: '#2a251f',
+            background: '#fef9ee', height: '100%', boxSizing: 'border-box',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              fontFamily: '"JetBrains Mono", monospace',
+              fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase',
+              color: '#8a7f70', marginBottom: 14,
+            }}>The engagement playbook</div>
+            <div style={{
+              fontFamily: '"Cormorant Garamond", serif', fontSize: 30, lineHeight: 1.1,
+              fontWeight: 500, marginBottom: 18,
+            }}>3 archetypes, repeated.</div>
+            <p style={{ margin: '0 0 12px' }}>
+              <b>Hero pins</b> (01, 08) — full-bleed prints with a peak name + elevation overlay.
+              These are the workhorse — one per peak, infinite variations.
+            </p>
+            <p style={{ margin: '0 0 12px' }}>
+              <b>Set pins</b> (03, 04, 09) — show the bundle. Highest CTR because the curiosity
+              gap (“see all 6”) drives the click.
+            </p>
+            <p style={{ margin: '0 0 12px' }}>
+              <b>Editorial pins</b> (02, 05, 06, 07, 10) — give the algorithm SEO surface and the
+              human a story. Map locator and honesty pin double as differentiators.
+            </p>
+            <div style={{
+              marginTop: 18, paddingTop: 14, borderTop: '1px solid rgba(0,0,0,.12)',
+              fontFamily: '"JetBrains Mono", monospace', fontSize: 11,
+              letterSpacing: '0.06em', lineHeight: 1.7,
+            }}>
+              <div>Brand wordmark · top-left, every pin</div>
+              <div>“Shop on Etsy” CTA · bottom-right, every pin</div>
+              <div>Specificity rule · peak + elevation + view dir on every pin</div>
+              <div>Type system · Cormorant + JetBrains Mono</div>
+            </div>
+          </div>
+        </DCArtboard>
+      </DCSection>
+
+      <DCSection id="hero" title="Hero pins" subtitle="Workhorse — one per peak; full-bleed art with overlay">
+        {PINS.filter(p => p.archetype === 'hero').map(p => (
+          <DCArtboard key={p.id} id={p.id} label={p.label} width={ART_W} height={ART_H}>
+            <Pin scale={SCALE}><p.Comp /></Pin>
+          </DCArtboard>
+        ))}
+      </DCSection>
+
+      <DCSection id="set" title="Set / bundle pins" subtitle="Highest click-through — curiosity gap on the gallery wall">
+        {PINS.filter(p => p.archetype === 'set').map(p => (
+          <DCArtboard key={p.id} id={p.id} label={p.label} width={ART_W} height={ART_H}>
+            <Pin scale={SCALE}><p.Comp /></Pin>
+          </DCArtboard>
+        ))}
+      </DCSection>
+
+      <DCSection id="editorial" title="Editorial pins" subtitle="SEO surface + differentiation — typographic, lifestyle, process">
+        {PINS.filter(p => p.archetype === 'editorial').map(p => (
+          <DCArtboard key={p.id} id={p.id} label={p.label} width={ART_W} height={ART_H}>
+            <Pin scale={SCALE}><p.Comp /></Pin>
+          </DCArtboard>
+        ))}
+      </DCSection>
+    </DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
