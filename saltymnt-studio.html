@@ -1,0 +1,2274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SaltyMnt Studio — Etsy Art Production</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Caveat:wght@400;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,700&family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Montserrat:ital,wght@0,300;0,400;0,600;0,700;0,800;1,400&family=Playfair+Display:ital,wght@0,400;0,600;0,700;0,800;1,400;1,700&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  body { -webkit-font-smoothing: antialiased; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+  /* Slot preview */
+  .slot-preview {
+    position: relative;
+    width: 100%;
+    background: repeating-conic-gradient(#e7e5e4 0% 25%, #f5f5f4 0% 50%) 50% / 16px 16px;
+    overflow: hidden;
+    border-radius: 6px;
+  }
+  .slot-preview .bg-img {
+    width: 100%;
+    display: block;
+  }
+  .slot-preview .frame-png {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+    z-index: 3;
+  }
+  .art-rect {
+    position: absolute;
+    transform-origin: center center;
+    overflow: hidden;
+    z-index: 2;
+    box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.35);
+  }
+  .art-rect img {
+    width: 100%; height: 100%; display: block;
+  }
+  .art-rect.fit-cover img   { object-fit: cover;   object-position: center; }
+  .art-rect.fit-contain img { object-fit: contain; object-position: center; background: #fff; }
+  .art-rect .placeholder {
+    width: 100%; height: 100%;
+    background: repeating-linear-gradient(45deg, rgba(37,99,235,0.08), rgba(37,99,235,0.08) 10px, rgba(37,99,235,0.18) 10px, rgba(37,99,235,0.18) 20px);
+    display: flex; align-items: center; justify-content: center;
+    color: #1d4ed8; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+
+  .slot-preview.editing .art-rect {
+    outline: 2px dashed #2563eb;
+    outline-offset: 2px;
+    cursor: move;
+  }
+  .slot-preview.editing .handle {
+    position: absolute;
+    width: 14px; height: 14px;
+    background: #2563eb;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    z-index: 4;
+  }
+  .handle.handle-resize { right: -8px; bottom: -8px; cursor: nwse-resize; }
+  .handle.handle-rotate { left: 50%; top: -28px; transform: translateX(-50%); cursor: grab; background: #16a34a; }
+  .handle { display: none; }
+  .slot-preview.editing .handle { display: block; }
+
+  .dz { transition: border-color 0.2s, background 0.2s; }
+  .dz.drag { border-color: #0f172a; background: #f8fafc; }
+
+  .tab-btn { position: relative; }
+  .tab-btn.active { color: #0f172a; }
+  .tab-btn.active::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+    height: 2px; background: #0f172a;
+  }
+
+  details > summary { cursor: pointer; list-style: none; }
+  details > summary::-webkit-details-marker { display: none; }
+
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .badge-stone { background: #f5f5f4; color: #57534e; }
+  .badge-blue  { background: #dbeafe; color: #1d4ed8; }
+
+  .star-on  { color: #f59e0b; }
+  .star-off { color: #d6d3d1; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #0f172a; color: white; padding: 10px 18px; border-radius: 8px;
+    font-size: 13px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); z-index: 100;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Text layers (live preview) */
+  .text-layer {
+    position: absolute;
+    transform-origin: center center;
+    z-index: 5;
+    overflow: hidden;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    pointer-events: none;
+  }
+  .slot-preview.editing-text .text-layer {
+    pointer-events: auto;
+    outline: 1.5px dashed rgba(22, 163, 74, 0.65);
+    outline-offset: 2px;
+    cursor: move;
+  }
+  .slot-preview.editing-text .text-layer.active {
+    outline: 2px solid #16a34a;
+    outline-offset: 2px;
+  }
+  .slot-preview.editing-text .text-layer .tl-handle-resize {
+    position: absolute;
+    width: 12px; height: 12px;
+    right: -6px; bottom: -6px;
+    background: #16a34a;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    cursor: nwse-resize;
+    z-index: 6;
+  }
+  .slot-preview.editing-text .text-layer .tl-handle-rotate {
+    position: absolute;
+    width: 12px; height: 12px;
+    left: 50%; top: -22px;
+    transform: translateX(-50%);
+    background: #16a34a;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    cursor: grab;
+    z-index: 6;
+  }
+  .text-layer .tl-handle-resize, .text-layer .tl-handle-rotate { display: none; }
+  .slot-preview.editing-text .text-layer .tl-handle-resize,
+  .slot-preview.editing-text .text-layer .tl-handle-rotate { display: block; }
+
+  .swatch {
+    width: 22px; height: 22px; border-radius: 4px;
+    border: 1px solid rgba(0,0,0,0.1);
+    cursor: pointer; padding: 0; background: #fff;
+  }
+</style>
+</head>
+<body class="bg-stone-100 text-stone-900">
+
+<header class="bg-white border-b border-stone-200 sticky top-0 z-30">
+  <div class="max-w-7xl mx-auto px-6 py-3 flex items-center gap-4 flex-wrap">
+    <div class="flex items-center gap-3 mr-2">
+      <span class="text-2xl">🏔️</span>
+      <div>
+        <h1 class="text-base font-bold leading-none">SaltyMnt Studio</h1>
+        <p class="text-[11px] text-stone-500 mt-1">Firefly → Etsy listing pack, prints, Pinterest pins</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-2 ml-auto flex-wrap">
+      <label class="text-[11px] font-semibold uppercase tracking-widest text-stone-500">Collection</label>
+      <select id="collectionSelect" class="border border-stone-300 rounded-md px-2 py-1.5 text-sm bg-white"></select>
+      <button id="newCollectionBtn"    class="text-xs px-2.5 py-1.5 rounded-md border border-stone-300 hover:bg-stone-50">+ New</button>
+      <button id="renameCollectionBtn" class="text-xs px-2.5 py-1.5 rounded-md border border-stone-300 hover:bg-stone-50">Rename</button>
+      <button id="deleteCollectionBtn" class="text-xs px-2.5 py-1.5 rounded-md border border-stone-300 hover:bg-stone-50 text-red-600">Delete</button>
+      <span class="w-px h-5 bg-stone-200 mx-1"></span>
+      <button id="exportLibraryBtn" class="text-xs px-2.5 py-1.5 rounded-md border border-stone-300 hover:bg-stone-50">⬆ Export library</button>
+      <button id="importLibraryBtn" class="text-xs px-2.5 py-1.5 rounded-md border border-stone-300 hover:bg-stone-50">⬇ Import library</button>
+      <input id="importFileInput" type="file" accept="application/json" class="hidden" />
+    </div>
+  </div>
+
+  <nav class="max-w-7xl mx-auto px-6 flex gap-6 text-sm font-semibold text-stone-500 border-t border-stone-100">
+    <button class="tab-btn py-3 active" data-tab="production">Production</button>
+    <button class="tab-btn py-3"        data-tab="mockups">Mockup Library</button>
+    <button class="tab-btn py-3"        data-tab="pins">Pin Library</button>
+    <button class="tab-btn py-3"        data-tab="help">How to use</button>
+  </nav>
+</header>
+
+<main class="max-w-7xl mx-auto px-6 py-8">
+
+  <!-- PRODUCTION TAB -->
+  <section id="tab-production" class="tab-panel">
+    <div class="bg-white border border-stone-200 rounded-2xl shadow-sm p-6 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Drop master -->
+        <div class="md:col-span-1">
+          <label class="block text-[11px] font-semibold uppercase tracking-widest text-stone-500 mb-2">Master artwork (Firefly export)</label>
+          <label id="masterDz" class="dz flex flex-col items-center justify-center h-48 border-2 border-dashed border-stone-300 rounded-xl cursor-pointer hover:border-stone-500 bg-stone-50">
+            <input id="masterFileInput" type="file" accept="image/*" class="hidden" />
+            <div id="masterPlaceholder" class="text-center px-4">
+              <div class="text-3xl mb-1">⬆️</div>
+              <div class="text-sm font-medium text-stone-700">Drop or click to load</div>
+              <div class="text-xs text-stone-400 mt-1">PNG, JPG, WEBP — any size</div>
+            </div>
+            <img id="masterPreview" class="hidden h-full w-full object-contain p-2" alt="" />
+          </label>
+          <div class="flex justify-between items-center mt-2">
+            <button id="clearMasterBtn" class="text-xs text-stone-500 hover:text-stone-800 hidden">Remove image</button>
+            <span id="masterDims" class="text-xs text-stone-400"></span>
+          </div>
+        </div>
+
+        <!-- Filename + orientation -->
+        <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-widest text-stone-500 mb-2">Output filename base</label>
+            <input id="outputName" type="text" placeholder="mountain_sunset" class="w-full border border-stone-300 rounded-md px-3 py-2 text-sm" />
+            <p class="text-xs text-stone-400 mt-1.5">Used for zip + file names. Auto-filled from master file.</p>
+          </div>
+          <div>
+            <label class="block text-[11px] font-semibold uppercase tracking-widest text-stone-500 mb-2">Detected orientation</label>
+            <div id="orientationBadge" class="badge badge-stone">—</div>
+            <p class="text-xs text-stone-400 mt-1.5">Print sizes auto-filter to match. Square uses square set only.</p>
+          </div>
+
+          <div class="sm:col-span-2 border-t border-stone-100 pt-4 mt-2">
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-[11px] font-semibold uppercase tracking-widest text-stone-500">Print sizes (300 DPI)</label>
+              <div class="flex gap-2 text-xs">
+                <button id="selectAllSizesBtn" class="text-stone-500 hover:text-stone-900">Select all</button>
+                <span class="text-stone-300">·</span>
+                <button id="selectNoneSizesBtn" class="text-stone-500 hover:text-stone-900">Clear</button>
+              </div>
+            </div>
+            <div id="sizeFamilies" class="space-y-3"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white border border-stone-200 rounded-2xl shadow-sm p-6">
+      <h2 class="text-sm font-bold mb-4">Generate listing pack</h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="border border-stone-200 rounded-xl p-4">
+          <div class="flex items-baseline justify-between">
+            <h3 class="text-sm font-semibold">Listing photos</h3>
+            <span id="mockupStatus" class="badge badge-stone">0 / 10</span>
+          </div>
+          <p class="text-xs text-stone-500 mt-1">Room mockups for the active collection. Hero = listing photo #1.</p>
+          <button id="downloadListingBtn" class="mt-3 w-full bg-stone-900 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-stone-800 disabled:opacity-40" disabled>
+            ⬇ Download listing photos
+          </button>
+        </div>
+        <div class="border border-stone-200 rounded-xl p-4">
+          <div class="flex items-baseline justify-between">
+            <h3 class="text-sm font-semibold">Print sizes</h3>
+            <span id="printStatus" class="badge badge-stone">0 selected</span>
+          </div>
+          <p class="text-xs text-stone-500 mt-1">JPGs at 300 DPI in your selected sizes, center-cropped to ratio.</p>
+          <button id="downloadPrintsBtn" class="mt-3 w-full bg-stone-900 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-stone-800 disabled:opacity-40" disabled>
+            ⬇ Download prints
+          </button>
+        </div>
+        <div class="border border-stone-200 rounded-xl p-4">
+          <div class="flex items-baseline justify-between">
+            <h3 class="text-sm font-semibold">Pinterest pins</h3>
+            <span id="pinStatus" class="badge badge-stone">0 / 10</span>
+          </div>
+          <p class="text-xs text-stone-500 mt-1">2:3, 1:1, and 2:1 pins from your saved templates.</p>
+          <button id="downloadPinsBtn" class="mt-3 w-full bg-stone-900 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-stone-800 disabled:opacity-40" disabled>
+            ⬇ Download Pinterest pins
+          </button>
+        </div>
+      </div>
+      <p id="prodHint" class="text-xs text-stone-500 mt-4">Drop a master artwork above to enable downloads.</p>
+    </div>
+  </section>
+
+  <!-- MOCKUP LIBRARY TAB -->
+  <section id="tab-mockups" class="tab-panel hidden">
+    <div class="bg-white border border-stone-200 rounded-2xl shadow-sm p-5 mb-4 flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <h2 class="text-sm font-bold">Mockup library — <span id="mockupCollectionName" class="text-stone-500"></span></h2>
+        <p class="text-xs text-stone-500 mt-0.5">10 slots per collection. Upload a scene photo, drag the art rectangle to fit the frame opening, mark one as Hero.</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="resetMockupSlotsBtn" class="text-xs px-3 py-1.5 rounded-md border border-stone-300 hover:bg-stone-50">Clear all 10 slots</button>
+      </div>
+    </div>
+    <div id="mockupSlotsRoot" class="grid grid-cols-1 md:grid-cols-2 gap-5"></div>
+  </section>
+
+  <!-- PIN LIBRARY TAB -->
+  <section id="tab-pins" class="tab-panel hidden">
+    <div class="bg-white border border-stone-200 rounded-2xl shadow-sm p-5 mb-4 flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <h2 class="text-sm font-bold">Pinterest pin library — <span id="pinCollectionName" class="text-stone-500"></span></h2>
+        <p class="text-xs text-stone-500 mt-0.5">10 slots — fully editable. Upload a pin background, drop in editable text layers (any font, color, size), and optionally drop the master photo into the art rectangle. Pins 1, 2, 5, 6, 7, 8, 10 share the master photo by default; pins 3, 4, 9 are text-only.</p>
+      </div>
+      <div class="flex gap-2">
+        <button id="resetPinSlotsBtn" class="text-xs px-3 py-1.5 rounded-md border border-stone-300 hover:bg-stone-50">Clear all 10 slots</button>
+      </div>
+    </div>
+    <div id="pinSlotsRoot" class="grid grid-cols-1 md:grid-cols-3 gap-5"></div>
+  </section>
+
+  <!-- HELP TAB -->
+  <section id="tab-help" class="tab-panel hidden">
+    <div class="bg-white border border-stone-200 rounded-2xl shadow-sm p-6 max-w-3xl">
+      <h2 class="text-base font-bold mb-3">How the workflow works</h2>
+      <ol class="list-decimal pl-5 space-y-2 text-sm text-stone-700">
+        <li><strong>Set up a collection.</strong> Use the dropdown in the header → <em>+ New</em>. Each collection (Mountain, Blueprints, etc.) keeps its own 10 mockups and 10 pins.</li>
+        <li><strong>Fill the Mockup Library.</strong> Open the Mockup Library tab. For each of the 10 slots, upload a scene photo from your Etsy frame bundle, then click <em>Edit placement</em> and drag the blue rectangle to cover the frame opening. Mark one as ★ Hero — it becomes Etsy listing photo #1.</li>
+        <li><strong>Fill the Pin Library.</strong> On the Pin Library tab, each of the 10 slots is fully editable:
+          <ul class="list-disc pl-5 mt-1 space-y-0.5">
+            <li>Upload the pin background (with or without baked text). Format auto-detects from the image ratio.</li>
+            <li>Use <em>Apply master artwork</em> to choose whether the master photo gets dropped into this pin's photo box. By default pins 1, 2, 5, 6, 7, 8, 10 share the master photo; pins 3, 4, 9 are text-only.</li>
+            <li>Click <em>Edit photo box</em> to drag/resize/rotate the artwork rectangle.</li>
+            <li>Click <em>+ Add text</em> to overlay editable text. Pick font (Playfair, Inter, Bebas Neue, Caveat, etc.), weight, size, color, alignment, line height, letter-spacing, italic, rotation. Click <em>Edit text</em> to drag layers directly on the preview.</li>
+          </ul>
+        </li>
+        <li><strong>Produce.</strong> Open Production, drop your Firefly master, type a filename base, pick print sizes, hit the three Download buttons. You get three zips.</li>
+        <li><strong>Backup.</strong> Use <em>Export library</em> to save your collections + all uploaded scene photos as one JSON onto an external drive. <em>Import library</em> restores it.</li>
+      </ol>
+      <h3 class="text-sm font-bold mt-6 mb-2">Filename convention</h3>
+      <ul class="list-disc pl-5 text-sm text-stone-700 space-y-1">
+        <li>Listing photos: <code>01_hero_&lt;slot&gt;.png</code> through <code>10_&lt;slot&gt;.png</code></li>
+        <li>Prints: <code>&lt;name&gt;_8x10.jpg</code>, <code>&lt;name&gt;_A4.jpg</code>, etc.</li>
+        <li>Pins: <code>&lt;name&gt;_pin_&lt;slot&gt;.png</code></li>
+      </ul>
+      <p class="text-xs text-stone-400 mt-6">Storage: collections, scene photos, pin templates, and frame PNGs are kept in your browser via IndexedDB. Use Export library regularly so you have a copy on disk.</p>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast"></div>
+
+<script>
+(function () {
+
+// =========================================================================
+// IndexedDB helpers
+// =========================================================================
+const DB_NAME = 'saltymnt-studio';
+const DB_VER = 1;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VER);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('kv'))     db.createObjectStore('kv');
+      if (!db.objectStoreNames.contains('images')) db.createObjectStore('images');
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+async function kvGet(k) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('kv', 'readonly');
+    const r = tx.objectStore('kv').get(k);
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function kvSet(k, v) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(v, k);
+    tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
+  });
+}
+async function imgPut(id, blob) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('images', 'readwrite');
+    tx.objectStore('images').put(blob, id);
+    tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
+  });
+}
+async function imgGet(id) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('images', 'readonly');
+    const r = tx.objectStore('images').get(id);
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function imgDel(id) {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('images', 'readwrite');
+    tx.objectStore('images').delete(id);
+    tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
+  });
+}
+async function imgListIds() {
+  const db = await openDB();
+  return new Promise((res, rej) => {
+    const tx = db.transaction('images', 'readonly');
+    const r = tx.objectStore('images').getAllKeys();
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+
+// =========================================================================
+// Print size catalog
+// =========================================================================
+const SIZE_FAMILIES = [
+  { id: 'standard', label: 'Standard (inches)', sizes: [
+    { id: '4x6',   w: 4,  h: 6  },
+    { id: '5x7',   w: 5,  h: 7  },
+    { id: '8x10',  w: 8,  h: 10 },
+    { id: '11x14', w: 11, h: 14 },
+    { id: '12x16', w: 12, h: 16 },
+    { id: '16x20', w: 16, h: 20 },
+    { id: '18x24', w: 18, h: 24 },
+    { id: '24x36', w: 24, h: 36 },
+  ]},
+  { id: 'square', label: 'Square (inches)', sizes: [
+    { id: '8x8',   w: 8,  h: 8  },
+    { id: '10x10', w: 10, h: 10 },
+    { id: '12x12', w: 12, h: 12 },
+    { id: '16x16', w: 16, h: 16 },
+    { id: '20x20', w: 20, h: 20 },
+    { id: '24x24', w: 24, h: 24 },
+  ]},
+  { id: 'iso', label: 'ISO A-series (inches, portrait values)', sizes: [
+    { id: 'A5', w: 5.83,  h: 8.27  },
+    { id: 'A4', w: 8.27,  h: 11.69 },
+    { id: 'A3', w: 11.69, h: 16.54 },
+    { id: 'A2', w: 16.54, h: 23.39 },
+    { id: 'A1', w: 23.39, h: 33.11 },
+  ]},
+];
+const DPI = 300;
+
+// =========================================================================
+// State
+// =========================================================================
+const NUM_MOCKUP_SLOTS = 10;
+const NUM_PIN_SLOTS = 10;
+const PIN_FORMATS = {
+  '2:3': { w: 1000, h: 1500 },
+  '1:1': { w: 1000, h: 1000 },
+  '2:1': { w: 1000, h: 2000 },
+};
+
+let library = null;            // { version, activeCollectionId, collections: {id: {...}} }
+const imageURLCache = {};      // imageId -> objectURL (for live preview)
+let masterArt = null;          // { blob, url, w, h, name, orientation }
+let sizeEnabled = {};          // sizeId -> bool (for production UI)
+
+function uid() { return 'id_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36); }
+
+function emptyScene() {
+  return {
+    id: uid(), name: 'Scene',
+    mode: 'baked',                 // 'baked' | 'png-overlay'
+    bgImageId: null,
+    framePngImageId: null,
+    placement: { x: 30, y: 30, w: 40, h: 30, rot: 0 },
+    fit: 'cover',
+  };
+}
+function emptyPin() {
+  return {
+    id: uid(), name: 'Pin',
+    format: '2:3',                 // '2:3' | '1:1' | '2:1'
+    templateImageId: null,
+    placement: { x: 20, y: 30, w: 60, h: 40, rot: 0 },
+    fit: 'cover',
+    useMasterArt: true,            // when false, photo box is hidden in preview + export
+    textLayers: [],                // [{ id, text, x, y, w, rot, fontFamily, fontSize, fontWeight, italic, color, align, lineHeight, letterSpacing }]
+  };
+}
+
+// Default master-art behavior per pin slot index:
+// pins 1, 2, 5, 6, 7, 8, 10 share the master photo; pins 3, 4, 9 do not.
+const PIN_USE_MASTER_BY_INDEX = [true, true, false, false, true, true, true, true, false, true];
+
+function emptyTextLayer(text) {
+  return {
+    id: uid(),
+    text: text || 'Your text here',
+    x: 8, y: 10, w: 84, rot: 0,
+    fontFamily: 'Playfair Display',
+    fontSize: 7,                   // % of preview/canvas height
+    fontWeight: 700,
+    italic: false,
+    color: '#1a1a1a',
+    align: 'center',               // 'left' | 'center' | 'right'
+    lineHeight: 1.2,
+    letterSpacing: 0,              // px (will scale with fontSize)
+  };
+}
+
+const FONT_OPTIONS = [
+  'Playfair Display',
+  'DM Serif Display',
+  'Cormorant Garamond',
+  'Lora',
+  'Inter',
+  'Montserrat',
+  'Poppins',
+  'Bebas Neue',
+  'Caveat',
+  'Georgia',
+  'Helvetica',
+  'Arial',
+  'Times New Roman',
+  'Courier New',
+];
+function emptyCollection(name) {
+  return {
+    id: uid(), name,
+    heroSceneId: null,
+    scenes: Array.from({ length: NUM_MOCKUP_SLOTS }, () => emptyScene()),
+    pins: Array.from({ length: NUM_PIN_SLOTS }, (_, i) => {
+      const p = emptyPin();
+      p.name = `Pin ${i + 1}`;
+      p.useMasterArt = PIN_USE_MASTER_BY_INDEX[i] ?? true;
+      return p;
+    }),
+  };
+}
+function defaultLibrary() {
+  const c = emptyCollection('Untitled collection');
+  return { version: 1, activeCollectionId: c.id, collections: { [c.id]: c } };
+}
+function activeCollection() {
+  return library.collections[library.activeCollectionId];
+}
+
+async function loadLibrary() {
+  let lib = await kvGet('library');
+  if (!lib) lib = defaultLibrary();
+  // Migrate older shapes / fix bad refs
+  if (!lib.collections) lib = defaultLibrary();
+  for (const c of Object.values(lib.collections)) {
+    if (!Array.isArray(c.scenes)) c.scenes = [];
+    while (c.scenes.length < NUM_MOCKUP_SLOTS) c.scenes.push(emptyScene());
+    if (!Array.isArray(c.pins)) c.pins = [];
+    while (c.pins.length < NUM_PIN_SLOTS) c.pins.push(emptyPin());
+    // Backfill new pin fields on libraries created before text-layer support.
+    c.pins.forEach((p, i) => {
+      if (typeof p.useMasterArt !== 'boolean') {
+        p.useMasterArt = PIN_USE_MASTER_BY_INDEX[i] ?? true;
+      }
+      if (!Array.isArray(p.textLayers)) p.textLayers = [];
+      // Sanitize text layers
+      p.textLayers = p.textLayers.map(t => ({ ...emptyTextLayer(), ...t, id: t.id || uid() }));
+    });
+  }
+  library = lib;
+}
+async function saveLibrary() {
+  await kvSet('library', library);
+}
+
+async function ensureURL(imageId) {
+  if (!imageId) return null;
+  if (imageURLCache[imageId]) return imageURLCache[imageId];
+  const blob = await imgGet(imageId);
+  if (!blob) return null;
+  const url = URL.createObjectURL(blob);
+  imageURLCache[imageId] = url;
+  return url;
+}
+function revokeURL(imageId) {
+  if (imageURLCache[imageId]) {
+    URL.revokeObjectURL(imageURLCache[imageId]);
+    delete imageURLCache[imageId];
+  }
+}
+
+async function storeImageFromFile(file) {
+  const id = uid();
+  await imgPut(id, file);
+  return id;
+}
+
+// Collect all imageIds referenced by the library
+function referencedImageIds() {
+  const ids = new Set();
+  for (const c of Object.values(library.collections || {})) {
+    for (const s of c.scenes || []) {
+      if (s.bgImageId) ids.add(s.bgImageId);
+      if (s.framePngImageId) ids.add(s.framePngImageId);
+    }
+    for (const p of c.pins || []) {
+      if (p.templateImageId) ids.add(p.templateImageId);
+    }
+  }
+  return ids;
+}
+async function gcImages() {
+  const refs = referencedImageIds();
+  const all = await imgListIds();
+  for (const id of all) {
+    if (!refs.has(id)) {
+      await imgDel(id);
+      revokeURL(id);
+    }
+  }
+}
+
+// =========================================================================
+// UI helpers
+// =========================================================================
+function $(sel, root = document) { return root.querySelector(sel); }
+function $$(sel, root = document) { return Array.from(root.querySelectorAll(sel)); }
+
+const toastEl = $('#toast');
+let toastTimer = null;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1800);
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function slugify(s) {
+  return (s || '').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase() || 'untitled';
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+// =========================================================================
+// Tabs
+// =========================================================================
+$$('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    $$('.tab-btn').forEach(b => b.classList.toggle('active', b === btn));
+    const tab = btn.dataset.tab;
+    $$('.tab-panel').forEach(p => p.classList.toggle('hidden', p.id !== `tab-${tab}`));
+  });
+});
+
+// =========================================================================
+// Collection UI
+// =========================================================================
+const collectionSelect = $('#collectionSelect');
+
+function renderCollectionPicker() {
+  collectionSelect.innerHTML = '';
+  const cs = Object.values(library.collections);
+  cs.sort((a, b) => a.name.localeCompare(b.name));
+  for (const c of cs) {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    if (c.id === library.activeCollectionId) opt.selected = true;
+    collectionSelect.appendChild(opt);
+  }
+  $('#mockupCollectionName').textContent = activeCollection().name;
+  $('#pinCollectionName').textContent = activeCollection().name;
+}
+
+collectionSelect.addEventListener('change', async () => {
+  library.activeCollectionId = collectionSelect.value;
+  await saveLibrary();
+  await renderAll();
+});
+
+$('#newCollectionBtn').addEventListener('click', async () => {
+  const name = prompt('Name for the new collection (e.g. "Mountain", "Blueprints"):');
+  if (!name) return;
+  const c = emptyCollection(name.trim());
+  library.collections[c.id] = c;
+  library.activeCollectionId = c.id;
+  await saveLibrary();
+  await renderAll();
+});
+
+$('#renameCollectionBtn').addEventListener('click', async () => {
+  const c = activeCollection();
+  const name = prompt('Rename collection:', c.name);
+  if (!name) return;
+  c.name = name.trim();
+  await saveLibrary();
+  await renderAll();
+});
+
+$('#deleteCollectionBtn').addEventListener('click', async () => {
+  const c = activeCollection();
+  if (Object.keys(library.collections).length === 1) {
+    alert('Cannot delete the last collection. Create another first.');
+    return;
+  }
+  if (!confirm(`Delete collection "${c.name}"? This removes its 10 mockups and 10 pins. (Master art is unaffected.)`)) return;
+  delete library.collections[c.id];
+  library.activeCollectionId = Object.keys(library.collections)[0];
+  await saveLibrary();
+  await gcImages();
+  await renderAll();
+});
+
+// =========================================================================
+// Export / Import
+// =========================================================================
+async function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+async function dataURLToBlob(dataUrl) {
+  const r = await fetch(dataUrl);
+  return await r.blob();
+}
+
+$('#exportLibraryBtn').addEventListener('click', async () => {
+  const refs = Array.from(referencedImageIds());
+  const images = {};
+  for (const id of refs) {
+    const blob = await imgGet(id);
+    if (blob) images[id] = await blobToDataURL(blob);
+  }
+  const payload = { version: 1, library, images };
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+  const date = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `saltymnt-library-${date}.json`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  toast('Library exported');
+});
+
+$('#importLibraryBtn').addEventListener('click', () => $('#importFileInput').click());
+$('#importFileInput').addEventListener('change', async e => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  e.target.value = '';
+  if (!confirm('Replace your current library with the imported one? Export first if you want a backup.')) return;
+  try {
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    if (!payload.library || !payload.images) throw new Error('Invalid library file.');
+    // Wipe existing image cache
+    for (const id of Object.keys(imageURLCache)) revokeURL(id);
+    // Replace library
+    library = payload.library;
+    await saveLibrary();
+    // Restore images
+    for (const [id, dataUrl] of Object.entries(payload.images)) {
+      const blob = await dataURLToBlob(dataUrl);
+      await imgPut(id, blob);
+    }
+    await gcImages();
+    await renderAll();
+    toast('Library imported');
+  } catch (err) {
+    alert('Import failed: ' + err.message);
+  }
+});
+
+// =========================================================================
+// Master artwork drop
+// =========================================================================
+const masterDz = $('#masterDz');
+const masterFileInput = $('#masterFileInput');
+const masterPlaceholder = $('#masterPlaceholder');
+const masterPreview = $('#masterPreview');
+const clearMasterBtn = $('#clearMasterBtn');
+const masterDims = $('#masterDims');
+const outputName = $('#outputName');
+
+['dragenter', 'dragover'].forEach(ev => masterDz.addEventListener(ev, e => { e.preventDefault(); masterDz.classList.add('drag'); }));
+['dragleave', 'drop'].forEach(ev => masterDz.addEventListener(ev, e => { e.preventDefault(); masterDz.classList.remove('drag'); }));
+masterDz.addEventListener('drop', e => { e.preventDefault(); if (e.dataTransfer.files?.[0]) loadMaster(e.dataTransfer.files[0]); });
+masterFileInput.addEventListener('change', e => { if (e.target.files?.[0]) loadMaster(e.target.files[0]); });
+clearMasterBtn.addEventListener('click', e => { e.preventDefault(); clearMaster(); });
+
+function loadMaster(file) {
+  if (!file.type.startsWith('image/')) { alert('That doesn\'t look like an image.'); return; }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    if (masterArt?.url) URL.revokeObjectURL(masterArt.url);
+    const ratio = img.naturalWidth / img.naturalHeight;
+    let orientation;
+    if (ratio > 1.05)      orientation = 'landscape';
+    else if (ratio < 0.95) orientation = 'portrait';
+    else                   orientation = 'square';
+    masterArt = {
+      blob: file, url,
+      w: img.naturalWidth, h: img.naturalHeight,
+      name: file.name, orientation,
+    };
+    masterPreview.src = url;
+    masterPreview.classList.remove('hidden');
+    masterPlaceholder.classList.add('hidden');
+    clearMasterBtn.classList.remove('hidden');
+    masterDims.textContent = `${img.naturalWidth} × ${img.naturalHeight}px · ${orientation}`;
+    outputName.value = slugify(file.name);
+    updateOrientationBadge();
+    renderSizeFamilies();
+    renderProductionStatus();
+    refreshAllSlotPreviews();
+  };
+  img.src = url;
+}
+
+function clearMaster() {
+  if (masterArt?.url) URL.revokeObjectURL(masterArt.url);
+  masterArt = null;
+  masterPreview.classList.add('hidden');
+  masterPreview.removeAttribute('src');
+  masterPlaceholder.classList.remove('hidden');
+  clearMasterBtn.classList.add('hidden');
+  masterDims.textContent = '';
+  masterFileInput.value = '';
+  outputName.value = '';
+  updateOrientationBadge();
+  renderSizeFamilies();
+  renderProductionStatus();
+  refreshAllSlotPreviews();
+}
+
+function updateOrientationBadge() {
+  const el = $('#orientationBadge');
+  if (!masterArt) { el.textContent = '—'; el.className = 'badge badge-stone'; return; }
+  el.textContent = masterArt.orientation;
+  el.className = 'badge ' + (
+    masterArt.orientation === 'portrait'  ? 'badge-blue' :
+    masterArt.orientation === 'landscape' ? 'badge-green' : 'badge-amber'
+  );
+}
+
+// =========================================================================
+// Size family UI (production tab)
+// =========================================================================
+function sizesForOrientation() {
+  if (!masterArt) return [];
+  const o = masterArt.orientation;
+  const list = [];
+  for (const fam of SIZE_FAMILIES) {
+    if (o === 'square' && fam.id !== 'square') continue;
+    if (o !== 'square' && fam.id === 'square') continue;
+    for (const s of fam.sizes) {
+      // Portrait orientation: keep portrait-defined sizes as is.
+      // Landscape orientation: swap dimensions for non-square sizes.
+      let w = s.w, h = s.h;
+      if (o === 'landscape' && fam.id !== 'square') { w = s.h; h = s.w; }
+      list.push({ familyId: fam.id, familyLabel: fam.label, id: s.id, w, h });
+    }
+  }
+  return list;
+}
+
+function renderSizeFamilies() {
+  const root = $('#sizeFamilies');
+  root.innerHTML = '';
+  if (!masterArt) {
+    root.innerHTML = `<p class="text-xs text-stone-400">Drop a master artwork to see available print sizes.</p>`;
+    return;
+  }
+  const list = sizesForOrientation();
+  // ensure all enabled by default first time
+  for (const s of list) if (!(s.id in sizeEnabled)) sizeEnabled[s.id] = true;
+  // group by family
+  const byFam = {};
+  for (const s of list) (byFam[s.familyLabel] = byFam[s.familyLabel] || []).push(s);
+  for (const [label, sizes] of Object.entries(byFam)) {
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <div class="text-[10px] uppercase tracking-wider text-stone-400 font-semibold mb-1.5">${label}</div>
+      <div class="flex flex-wrap gap-2"></div>`;
+    const row = wrap.querySelector('div:last-child');
+    for (const s of sizes) {
+      const b = document.createElement('button');
+      b.className = 'text-xs px-3 py-1.5 rounded-md border';
+      const apply = () => {
+        b.classList.toggle('bg-stone-900',     sizeEnabled[s.id]);
+        b.classList.toggle('text-white',       sizeEnabled[s.id]);
+        b.classList.toggle('border-stone-900', sizeEnabled[s.id]);
+        b.classList.toggle('border-stone-200', !sizeEnabled[s.id]);
+        b.classList.toggle('text-stone-700',   !sizeEnabled[s.id]);
+        b.classList.toggle('hover:bg-stone-50', !sizeEnabled[s.id]);
+      };
+      b.textContent = s.id;
+      apply();
+      b.addEventListener('click', () => { sizeEnabled[s.id] = !sizeEnabled[s.id]; apply(); renderProductionStatus(); });
+      row.appendChild(b);
+    }
+    root.appendChild(wrap);
+  }
+}
+
+$('#selectAllSizesBtn').addEventListener('click', () => {
+  for (const s of sizesForOrientation()) sizeEnabled[s.id] = true;
+  renderSizeFamilies(); renderProductionStatus();
+});
+$('#selectNoneSizesBtn').addEventListener('click', () => {
+  for (const s of sizesForOrientation()) sizeEnabled[s.id] = false;
+  renderSizeFamilies(); renderProductionStatus();
+});
+
+// =========================================================================
+// Production status badges
+// =========================================================================
+function configuredScenes() {
+  return activeCollection().scenes.filter(s => s.bgImageId);
+}
+function configuredPins() {
+  return activeCollection().pins.filter(p => p.templateImageId);
+}
+function selectedSizes() {
+  return sizesForOrientation().filter(s => sizeEnabled[s.id]);
+}
+function renderProductionStatus() {
+  const scenes = configuredScenes();
+  const pins = configuredPins();
+  const sizes = selectedSizes();
+
+  $('#mockupStatus').textContent = `${scenes.length} / ${NUM_MOCKUP_SLOTS}`;
+  $('#mockupStatus').className = 'badge ' + (scenes.length === NUM_MOCKUP_SLOTS ? 'badge-green' : (scenes.length ? 'badge-amber' : 'badge-stone'));
+
+  $('#pinStatus').textContent = `${pins.length} / ${NUM_PIN_SLOTS}`;
+  $('#pinStatus').className = 'badge ' + (pins.length === NUM_PIN_SLOTS ? 'badge-green' : (pins.length ? 'badge-amber' : 'badge-stone'));
+
+  $('#printStatus').textContent = `${sizes.length} selected`;
+  $('#printStatus').className = 'badge ' + (sizes.length ? 'badge-green' : 'badge-stone');
+
+  $('#downloadListingBtn').disabled = !masterArt || scenes.length === 0;
+  $('#downloadPrintsBtn').disabled  = !masterArt || sizes.length === 0;
+  $('#downloadPinsBtn').disabled    = !masterArt || pins.length === 0;
+
+  $('#prodHint').textContent = !masterArt
+    ? 'Drop a master artwork above to enable downloads.'
+    : 'Each download produces one zip. Listing photos and pins use the active collection.';
+}
+
+// =========================================================================
+// Slot preview rendering (HTML/CSS, live)
+// =========================================================================
+function renderArtRectInside(container, placement, fit, artUrl, naturalAspect) {
+  // Drops in a positioned art-rect, plus resize/rotate handles for editing.
+  // placement is %.
+  let rect = container.querySelector('.art-rect');
+  if (!rect) {
+    rect = document.createElement('div');
+    rect.className = 'art-rect fit-' + (fit || 'cover');
+    rect.innerHTML = '<img alt="" /><div class="placeholder">art goes here</div>';
+    container.appendChild(rect);
+  }
+  rect.classList.toggle('fit-cover',   fit === 'cover');
+  rect.classList.toggle('fit-contain', fit === 'contain');
+  const img = rect.querySelector('img');
+  const ph  = rect.querySelector('.placeholder');
+  if (artUrl) { img.src = artUrl; img.style.display = ''; ph.style.display = 'none'; }
+  else        { img.removeAttribute('src'); img.style.display = 'none'; ph.style.display = ''; }
+
+  rect.style.left   = placement.x + '%';
+  rect.style.top    = placement.y + '%';
+  rect.style.width  = placement.w + '%';
+  rect.style.height = placement.h + '%';
+  rect.style.transform = `rotate(${placement.rot}deg)`;
+
+  // handles
+  let resize = container.querySelector('.handle-resize');
+  if (!resize) {
+    resize = document.createElement('div'); resize.className = 'handle handle-resize';
+    container.appendChild(resize);
+  }
+  let rotate = container.querySelector('.handle-rotate');
+  if (!rotate) {
+    rotate = document.createElement('div'); rotate.className = 'handle handle-rotate';
+    container.appendChild(rotate);
+  }
+  // position handles on the rect's bounding box
+  function positionHandles() {
+    const cw = container.clientWidth, ch = container.clientHeight;
+    const x = (placement.x / 100) * cw;
+    const y = (placement.y / 100) * ch;
+    const w = (placement.w / 100) * cw;
+    const h = (placement.h / 100) * ch;
+    resize.style.left = (x + w - 7) + 'px';
+    resize.style.top  = (y + h - 7) + 'px';
+    rotate.style.left = (x + w / 2) + 'px';
+    rotate.style.top  = (y - 28) + 'px';
+    rotate.style.transform = 'translate(-50%, 0)';
+  }
+  positionHandles();
+  return { rect, resize, rotate, positionHandles };
+}
+
+// =========================================================================
+// Mockup slot UI
+// =========================================================================
+const mockupSlotsRoot = $('#mockupSlotsRoot');
+
+async function renderMockupSlots() {
+  mockupSlotsRoot.innerHTML = '';
+  const c = activeCollection();
+  for (let i = 0; i < c.scenes.length; i++) {
+    const card = await buildMockupCard(c.scenes[i], i);
+    mockupSlotsRoot.appendChild(card);
+  }
+}
+
+async function buildMockupCard(scene, idx) {
+  const card = document.createElement('article');
+  card.className = 'bg-white border border-stone-200 rounded-2xl shadow-sm p-4';
+
+  card.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-mono text-stone-400 w-8">${pad2(idx + 1)}</span>
+        <input class="slot-name border border-transparent hover:border-stone-200 focus:border-stone-300 rounded px-2 py-1 text-sm font-semibold bg-transparent" />
+      </div>
+      <div class="flex items-center gap-1">
+        <button class="hero-btn text-xl leading-none" title="Set as Hero (listing photo #1)">★</button>
+        <button class="clear-btn text-xs text-stone-400 hover:text-red-600 px-2" title="Clear slot">✕</button>
+      </div>
+    </div>
+
+    <div class="slot-preview" data-aspect=""></div>
+
+    <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+      <label class="block">
+        <span class="text-[10px] uppercase tracking-wider text-stone-400">Mode</span>
+        <select class="mode-sel w-full border border-stone-200 rounded px-2 py-1 mt-0.5">
+          <option value="baked">Baked-in frame (scene has frame)</option>
+          <option value="png-overlay">Frame PNG overlay</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="text-[10px] uppercase tracking-wider text-stone-400">Fit</span>
+        <select class="fit-sel w-full border border-stone-200 rounded px-2 py-1 mt-0.5">
+          <option value="cover">Cover</option>
+          <option value="contain">Contain</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="mt-2 flex gap-2 flex-wrap text-xs">
+      <button class="bg-btn px-3 py-1.5 rounded-md border border-stone-300 hover:bg-stone-50">Upload scene photo</button>
+      <input type="file" accept="image/*" class="bg-input hidden" />
+      <button class="png-btn hidden px-3 py-1.5 rounded-md border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100">Upload frame PNG</button>
+      <input type="file" accept="image/png,image/webp" class="png-input hidden" />
+      <button class="edit-btn ml-auto px-3 py-1.5 rounded-md border border-stone-300 hover:bg-stone-50">Edit placement</button>
+    </div>
+
+    <div class="edit-controls hidden mt-3 grid grid-cols-5 gap-2 text-xs">
+      <label><span class="text-[10px] uppercase tracking-wider text-stone-400">X %</span><input type="number" step="0.5" class="x-in w-full border border-stone-200 rounded px-2 py-1 mt-0.5" /></label>
+      <label><span class="text-[10px] uppercase tracking-wider text-stone-400">Y %</span><input type="number" step="0.5" class="y-in w-full border border-stone-200 rounded px-2 py-1 mt-0.5" /></label>
+      <label><span class="text-[10px] uppercase tracking-wider text-stone-400">W %</span><input type="number" step="0.5" class="w-in w-full border border-stone-200 rounded px-2 py-1 mt-0.5" /></label>
+      <label><span class="text-[10px] uppercase tracking-wider text-stone-400">H %</span><input type="number" step="0.5" class="h-in w-full border border-stone-200 rounded px-2 py-1 mt-0.5" /></label>
+      <label><span class="text-[10px] uppercase tracking-wider text-stone-400">Rot °</span><input type="number" step="0.5" class="r-in w-full border border-stone-200 rounded px-2 py-1 mt-0.5" /></label>
+    </div>
+    <div class="edit-actions hidden mt-2 flex justify-end gap-2 text-xs">
+      <button class="cancel-btn px-3 py-1 rounded border border-stone-200 hover:bg-stone-50">Cancel</button>
+      <button class="save-btn px-3 py-1 rounded bg-stone-900 text-white hover:bg-stone-800">Save</button>
+    </div>
+  `;
+
+  const nameInput = card.querySelector('.slot-name');
+  const heroBtn = card.querySelector('.hero-btn');
+  const clearBtn = card.querySelector('.clear-btn');
+  const preview = card.querySelector('.slot-preview');
+  const modeSel = card.querySelector('.mode-sel');
+  const fitSel  = card.querySelector('.fit-sel');
+  const bgBtn = card.querySelector('.bg-btn');
+  const bgInput = card.querySelector('.bg-input');
+  const pngBtn = card.querySelector('.png-btn');
+  const pngInput = card.querySelector('.png-input');
+  const editBtn = card.querySelector('.edit-btn');
+  const editControls = card.querySelector('.edit-controls');
+  const editActions  = card.querySelector('.edit-actions');
+  const xIn = card.querySelector('.x-in');
+  const yIn = card.querySelector('.y-in');
+  const wIn = card.querySelector('.w-in');
+  const hIn = card.querySelector('.h-in');
+  const rIn = card.querySelector('.r-in');
+  const cancelBtn = card.querySelector('.cancel-btn');
+  const saveBtn   = card.querySelector('.save-btn');
+
+  nameInput.value = scene.name || `Scene ${idx + 1}`;
+  modeSel.value = scene.mode;
+  fitSel.value  = scene.fit;
+  pngBtn.classList.toggle('hidden', scene.mode !== 'png-overlay');
+  setHeroVisual();
+
+  function setHeroVisual() {
+    const isHero = activeCollection().heroSceneId === scene.id;
+    heroBtn.classList.toggle('star-on', isHero);
+    heroBtn.classList.toggle('star-off', !isHero);
+  }
+
+  nameInput.addEventListener('change', async () => {
+    scene.name = nameInput.value.trim() || `Scene ${idx + 1}`;
+    await saveLibrary();
+  });
+
+  heroBtn.addEventListener('click', async () => {
+    const c = activeCollection();
+    c.heroSceneId = (c.heroSceneId === scene.id) ? null : scene.id;
+    await saveLibrary();
+    // refresh hero stars on all cards
+    for (const otherCard of mockupSlotsRoot.children) {
+      const isHero = false;
+      const btn = otherCard.querySelector('.hero-btn');
+      if (btn) {
+        btn.classList.remove('star-on'); btn.classList.add('star-off');
+      }
+    }
+    setHeroVisual();
+    renderProductionStatus();
+  });
+
+  clearBtn.addEventListener('click', async () => {
+    if (!confirm(`Clear slot ${idx + 1}? Removes its scene photo and resets placement.`)) return;
+    if (scene.bgImageId)        { revokeURL(scene.bgImageId); }
+    if (scene.framePngImageId)  { revokeURL(scene.framePngImageId); }
+    Object.assign(scene, emptyScene(), { id: scene.id, name: `Scene ${idx + 1}` });
+    if (activeCollection().heroSceneId === scene.id) activeCollection().heroSceneId = null;
+    await saveLibrary();
+    await gcImages();
+    await refreshSlotPreview();
+    renderProductionStatus();
+  });
+
+  modeSel.addEventListener('change', async () => {
+    scene.mode = modeSel.value;
+    pngBtn.classList.toggle('hidden', scene.mode !== 'png-overlay');
+    await saveLibrary();
+    await refreshSlotPreview();
+  });
+  fitSel.addEventListener('change', async () => {
+    scene.fit = fitSel.value;
+    await saveLibrary();
+    await refreshSlotPreview();
+  });
+
+  bgBtn.addEventListener('click', () => bgInput.click());
+  bgInput.addEventListener('change', async e => {
+    const f = e.target.files?.[0]; if (!f) return;
+    e.target.value = '';
+    if (scene.bgImageId) { revokeURL(scene.bgImageId); }
+    scene.bgImageId = await storeImageFromFile(f);
+    await saveLibrary();
+    await gcImages();
+    await refreshSlotPreview();
+    renderProductionStatus();
+  });
+
+  pngBtn.addEventListener('click', () => pngInput.click());
+  pngInput.addEventListener('change', async e => {
+    const f = e.target.files?.[0]; if (!f) return;
+    e.target.value = '';
+    if (scene.framePngImageId) { revokeURL(scene.framePngImageId); }
+    scene.framePngImageId = await storeImageFromFile(f);
+    await saveLibrary();
+    await gcImages();
+    await refreshSlotPreview();
+  });
+
+  // Edit mode
+  let backup = null;
+  editBtn.addEventListener('click', () => {
+    backup = { ...scene.placement };
+    preview.classList.add('editing');
+    editControls.classList.remove('hidden');
+    editActions.classList.remove('hidden');
+    editBtn.disabled = true;
+    syncEditInputs();
+  });
+  cancelBtn.addEventListener('click', () => {
+    scene.placement = backup;
+    exitEdit();
+    refreshSlotPreview();
+  });
+  saveBtn.addEventListener('click', async () => {
+    await saveLibrary();
+    exitEdit();
+  });
+  function exitEdit() {
+    preview.classList.remove('editing');
+    editControls.classList.add('hidden');
+    editActions.classList.add('hidden');
+    editBtn.disabled = false;
+  }
+  function syncEditInputs() {
+    xIn.value = scene.placement.x.toFixed(1);
+    yIn.value = scene.placement.y.toFixed(1);
+    wIn.value = scene.placement.w.toFixed(1);
+    hIn.value = scene.placement.h.toFixed(1);
+    rIn.value = scene.placement.rot.toFixed(1);
+  }
+  [['x', xIn], ['y', yIn], ['w', wIn], ['h', hIn], ['rot', rIn]].forEach(([key, inp]) => {
+    inp.addEventListener('input', () => {
+      const v = parseFloat(inp.value);
+      if (!Number.isFinite(v)) return;
+      scene.placement[key] = v;
+      refreshSlotPreview();
+    });
+  });
+
+  attachDragHandlers(preview, scene, refreshSlotPreview, syncEditInputs);
+
+  async function refreshSlotPreview() {
+    await renderSceneIntoPreview(preview, scene);
+  }
+  await refreshSlotPreview();
+
+  card._refresh = refreshSlotPreview;
+  return card;
+}
+
+async function renderSceneIntoPreview(container, scene) {
+  container.innerHTML = '';
+  const bgUrl = scene.bgImageId ? await ensureURL(scene.bgImageId) : null;
+  if (bgUrl) {
+    const bg = document.createElement('img');
+    bg.className = 'bg-img';
+    bg.src = bgUrl;
+    container.appendChild(bg);
+    container.style.aspectRatio = '';
+  } else {
+    container.style.aspectRatio = '4 / 3';
+    const empty = document.createElement('div');
+    empty.className = 'flex items-center justify-center h-full text-xs text-stone-400';
+    empty.textContent = 'No scene photo yet — upload one below';
+    empty.style.height = '100%';
+    container.appendChild(empty);
+  }
+  const artUrl = masterArt?.url || null;
+  // Always render the rect (even with no scene) so user can preview placement once they upload.
+  if (bgUrl) renderArtRectInside(container, scene.placement, scene.fit, artUrl);
+  if (scene.mode === 'png-overlay' && scene.framePngImageId) {
+    const pngUrl = await ensureURL(scene.framePngImageId);
+    if (pngUrl) {
+      const pngImg = document.createElement('img');
+      pngImg.className = 'frame-png';
+      pngImg.src = pngUrl;
+      container.appendChild(pngImg);
+    }
+  }
+}
+
+// =========================================================================
+// Pin slot UI
+// =========================================================================
+const pinSlotsRoot = $('#pinSlotsRoot');
+
+async function renderPinSlots() {
+  pinSlotsRoot.innerHTML = '';
+  const c = activeCollection();
+  for (let i = 0; i < c.pins.length; i++) {
+    const card = await buildPinCard(c.pins[i], i);
+    pinSlotsRoot.appendChild(card);
+  }
+}
+
+async function buildPinCard(pin, idx) {
+  const card = document.createElement('article');
+  card.className = 'bg-white border border-stone-200 rounded-2xl shadow-sm p-4';
+  card.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-mono text-stone-400 w-8">${pad2(idx + 1)}</span>
+        <input class="slot-name border border-transparent hover:border-stone-200 focus:border-stone-300 rounded px-2 py-1 text-sm font-semibold bg-transparent" />
+      </div>
+      <button class="clear-btn text-xs text-stone-400 hover:text-red-600 px-2" title="Clear slot">✕</button>
+    </div>
+
+    <div class="slot-preview" data-aspect="2 / 3"></div>
+
+    <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+      <label class="block">
+        <span class="text-[10px] uppercase tracking-wider text-stone-400">Format</span>
+        <select class="format-sel w-full border border-stone-200 rounded px-2 py-1 mt-0.5">
+          <option value="2:3">2:3 — 1000×1500 (standard)</option>
+          <option value="1:1">1:1 — 1000×1000 (square)</option>
+          <option value="2:1">2:1 — 1000×2000 (long)</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="text-[10px] uppercase tracking-wider text-stone-400">Fit</span>
+        <select class="fit-sel w-full border border-stone-200 rounded px-2 py-1 mt-0.5">
+          <option value="cover">Cover</option>
+          <option value="contain">Contain</option>
+        </select>
+      </label>
+    </div>
+
+    <label class="mt-2 flex items-center gap-2 text-xs select-none">
+      <input type="checkbox" class="use-master-cb" />
+      <span><span class="font-semibold">Apply master artwork</span> <span class="text-stone-400">(drops the master photo into the rectangle on this pin)</span></span>
+    </label>
+
+    <div class="mt-2 flex gap-2 flex-wrap text-xs">
+      <button class="tpl-btn px-3 py-1.5 rounded-md border border-stone-300 hover:bg-stone-50">Upload pin template</button>
+      <input type="file" accept="image/*" class="tpl-input hidden" />
+      <button class="edit-btn ml-auto px-3 py-1.5 rounded-md border border-stone-300 hover:bg-stone-50">Edit photo box</button>
+      <button class="edit-text-btn px-3 py-1.5 rounded-md border border-green-300 bg-green-50 text-green-800 hover:bg-green-100">Edit text</button>
+    </div>
+
+    <div class="edit-controls hidden mt-3 grid grid-cols-5 gap-2 text-xs">
+      <label><span class="text-[10px] uppercase tracking-wider text-stone-400">X %</span><input type="number" step="0.5" class="x-in w-full border border-stone-200 rounded px-2 py-1 mt-0.5" /></label>
+      <label><span class="text-[10px] uppercase tracking-wider text-stone-400">Y %</span><input type="number" step="0.5" class="y-in w-full border border-stone-200 rounded px-2 py-1 mt-0.5" /></label>
+      <label><span class="text-[10px] uppercase tracking-wider text-stone-400">W %</span><input type="number" step="0.5" class="w-in w-full border border-stone-200 rounded px-2 py-1 mt-0.5" /></label>
+      <label><span class="text-[10px] uppercase tracking-wider text-stone-400">H %</span><input type="number" step="0.5" class="h-in w-full border border-stone-200 rounded px-2 py-1 mt-0.5" /></label>
+      <label><span class="text-[10px] uppercase tracking-wider text-stone-400">Rot °</span><input type="number" step="0.5" class="r-in w-full border border-stone-200 rounded px-2 py-1 mt-0.5" /></label>
+    </div>
+    <div class="edit-actions hidden mt-2 flex justify-end gap-2 text-xs">
+      <button class="cancel-btn px-3 py-1 rounded border border-stone-200 hover:bg-stone-50">Cancel</button>
+      <button class="save-btn px-3 py-1 rounded bg-stone-900 text-white hover:bg-stone-800">Save</button>
+    </div>
+
+    <div class="text-layers-panel mt-4 pt-3 border-t border-stone-100">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[11px] font-semibold uppercase tracking-widest text-stone-500">Text layers</span>
+        <button class="add-text-btn text-xs px-2.5 py-1 rounded-md border border-stone-300 hover:bg-stone-50">+ Add text</button>
+      </div>
+      <div class="text-layers-list space-y-2"></div>
+    </div>
+  `;
+
+  const nameInput = card.querySelector('.slot-name');
+  const clearBtn = card.querySelector('.clear-btn');
+  const preview = card.querySelector('.slot-preview');
+  const formatSel = card.querySelector('.format-sel');
+  const fitSel = card.querySelector('.fit-sel');
+  const useMasterCb = card.querySelector('.use-master-cb');
+  const tplBtn = card.querySelector('.tpl-btn');
+  const tplInput = card.querySelector('.tpl-input');
+  const editBtn = card.querySelector('.edit-btn');
+  const editTextBtn = card.querySelector('.edit-text-btn');
+  const editControls = card.querySelector('.edit-controls');
+  const editActions  = card.querySelector('.edit-actions');
+  const xIn = card.querySelector('.x-in');
+  const yIn = card.querySelector('.y-in');
+  const wIn = card.querySelector('.w-in');
+  const hIn = card.querySelector('.h-in');
+  const rIn = card.querySelector('.r-in');
+  const cancelBtn = card.querySelector('.cancel-btn');
+  const saveBtn = card.querySelector('.save-btn');
+  const addTextBtn = card.querySelector('.add-text-btn');
+  const textLayersList = card.querySelector('.text-layers-list');
+
+  nameInput.value = pin.name || `Pin ${idx + 1}`;
+  formatSel.value = pin.format;
+  fitSel.value = pin.fit;
+  useMasterCb.checked = !!pin.useMasterArt;
+
+  nameInput.addEventListener('change', async () => {
+    pin.name = nameInput.value.trim() || `Pin ${idx + 1}`;
+    await saveLibrary();
+  });
+
+  clearBtn.addEventListener('click', async () => {
+    if (!confirm(`Clear pin slot ${idx + 1}? Removes its template, photo box settings, and text layers.`)) return;
+    if (pin.templateImageId) { revokeURL(pin.templateImageId); }
+    const keepUseMaster = PIN_USE_MASTER_BY_INDEX[idx] ?? true;
+    Object.assign(pin, emptyPin(), { id: pin.id, name: `Pin ${idx + 1}`, useMasterArt: keepUseMaster });
+    await saveLibrary();
+    await gcImages();
+    renderTextLayersList();
+    useMasterCb.checked = pin.useMasterArt;
+    await refreshPreview();
+    renderProductionStatus();
+  });
+
+  formatSel.addEventListener('change', async () => {
+    pin.format = formatSel.value;
+    await saveLibrary();
+    await refreshPreview();
+  });
+  fitSel.addEventListener('change', async () => {
+    pin.fit = fitSel.value;
+    await saveLibrary();
+    await refreshPreview();
+  });
+  useMasterCb.addEventListener('change', async () => {
+    pin.useMasterArt = useMasterCb.checked;
+    await saveLibrary();
+    await refreshPreview();
+  });
+
+  tplBtn.addEventListener('click', () => tplInput.click());
+  tplInput.addEventListener('change', async e => {
+    const f = e.target.files?.[0]; if (!f) return;
+    e.target.value = '';
+    if (pin.templateImageId) { revokeURL(pin.templateImageId); }
+    pin.templateImageId = await storeImageFromFile(f);
+    // Auto-detect format from template ratio
+    const url = await ensureURL(pin.templateImageId);
+    const probe = new Image();
+    probe.onload = async () => {
+      const r = probe.naturalWidth / probe.naturalHeight;
+      if (Math.abs(r - 1) < 0.05)        pin.format = '1:1';
+      else if (Math.abs(r - 2) < 0.1)    pin.format = '2:1';
+      else                               pin.format = '2:3';
+      formatSel.value = pin.format;
+      await saveLibrary();
+      await gcImages();
+      await refreshPreview();
+      renderProductionStatus();
+    };
+    probe.src = url;
+  });
+
+  let backup = null;
+  editBtn.addEventListener('click', () => {
+    backup = { ...pin.placement };
+    preview.classList.add('editing');
+    preview.classList.remove('editing-text');
+    editControls.classList.remove('hidden');
+    editActions.classList.remove('hidden');
+    editBtn.disabled = true;
+    editTextBtn.disabled = true;
+    syncEditInputs();
+  });
+  editTextBtn.addEventListener('click', () => {
+    const isOn = preview.classList.toggle('editing-text');
+    preview.classList.remove('editing');
+    editControls.classList.add('hidden');
+    editActions.classList.add('hidden');
+    editBtn.disabled = isOn;
+    editTextBtn.textContent = isOn ? 'Done editing text' : 'Edit text';
+    editTextBtn.classList.toggle('bg-green-600', isOn);
+    editTextBtn.classList.toggle('text-white', isOn);
+    refreshPreview();
+  });
+  cancelBtn.addEventListener('click', () => {
+    pin.placement = backup;
+    exitEdit();
+    refreshPreview();
+  });
+  saveBtn.addEventListener('click', async () => {
+    await saveLibrary();
+    exitEdit();
+  });
+  function exitEdit() {
+    preview.classList.remove('editing');
+    editControls.classList.add('hidden');
+    editActions.classList.add('hidden');
+    editBtn.disabled = false;
+    editTextBtn.disabled = false;
+  }
+  function syncEditInputs() {
+    xIn.value = pin.placement.x.toFixed(1);
+    yIn.value = pin.placement.y.toFixed(1);
+    wIn.value = pin.placement.w.toFixed(1);
+    hIn.value = pin.placement.h.toFixed(1);
+    rIn.value = pin.placement.rot.toFixed(1);
+  }
+  [['x', xIn], ['y', yIn], ['w', wIn], ['h', hIn], ['rot', rIn]].forEach(([key, inp]) => {
+    inp.addEventListener('input', () => {
+      const v = parseFloat(inp.value);
+      if (!Number.isFinite(v)) return;
+      pin.placement[key] = v;
+      refreshPreview();
+    });
+  });
+
+  attachDragHandlers(preview, pin, refreshPreview, syncEditInputs);
+  attachTextLayerHandlers(preview, pin, refreshPreview, () => renderTextLayersList());
+
+  // ---------- Text layers UI ----------
+  addTextBtn.addEventListener('click', async () => {
+    pin.textLayers.push(emptyTextLayer());
+    await saveLibrary();
+    renderTextLayersList();
+    await refreshPreview();
+  });
+
+  function renderTextLayersList() {
+    textLayersList.innerHTML = '';
+    if (!pin.textLayers.length) {
+      textLayersList.innerHTML = `<p class="text-[11px] text-stone-400 italic">No text yet — click <span class="font-semibold">+ Add text</span> to overlay editable text on the pin.</p>`;
+      return;
+    }
+    pin.textLayers.forEach((layer, lIdx) => {
+      textLayersList.appendChild(buildTextLayerRow(layer, lIdx));
+    });
+  }
+
+  function buildTextLayerRow(layer, lIdx) {
+    const row = document.createElement('div');
+    row.className = 'border border-stone-200 rounded-lg p-2.5 bg-stone-50';
+    row.innerHTML = `
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-[10px] uppercase tracking-wider text-stone-500 font-semibold">Layer ${lIdx + 1}</span>
+        <div class="flex items-center gap-1">
+          <button class="tl-up text-stone-400 hover:text-stone-700 px-1" title="Move up">▲</button>
+          <button class="tl-down text-stone-400 hover:text-stone-700 px-1" title="Move down">▼</button>
+          <button class="tl-del text-stone-400 hover:text-red-600 px-1" title="Delete layer">✕</button>
+        </div>
+      </div>
+      <textarea class="tl-text w-full border border-stone-200 rounded px-2 py-1 text-sm bg-white" rows="2" placeholder="Type your text…"></textarea>
+      <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
+        <label class="block">
+          <span class="text-[10px] uppercase tracking-wider text-stone-400">Font</span>
+          <select class="tl-font w-full border border-stone-200 rounded px-2 py-1 mt-0.5 bg-white">
+            ${FONT_OPTIONS.map(f => `<option value="${f}">${f}</option>`).join('')}
+          </select>
+        </label>
+        <label class="block">
+          <span class="text-[10px] uppercase tracking-wider text-stone-400">Weight</span>
+          <select class="tl-weight w-full border border-stone-200 rounded px-2 py-1 mt-0.5 bg-white">
+            <option value="300">300 Light</option>
+            <option value="400">400 Regular</option>
+            <option value="500">500 Medium</option>
+            <option value="600">600 Semibold</option>
+            <option value="700">700 Bold</option>
+            <option value="800">800 Extra</option>
+          </select>
+        </label>
+      </div>
+      <div class="grid grid-cols-4 gap-2 mt-2 text-xs">
+        <label class="block">
+          <span class="text-[10px] uppercase tracking-wider text-stone-400">Size %</span>
+          <input type="number" step="0.1" min="0.5" class="tl-size w-full border border-stone-200 rounded px-2 py-1 mt-0.5 bg-white" />
+        </label>
+        <label class="block">
+          <span class="text-[10px] uppercase tracking-wider text-stone-400">Line</span>
+          <input type="number" step="0.05" min="0.5" class="tl-lh w-full border border-stone-200 rounded px-2 py-1 mt-0.5 bg-white" />
+        </label>
+        <label class="block">
+          <span class="text-[10px] uppercase tracking-wider text-stone-400">Track</span>
+          <input type="number" step="0.5" class="tl-tracking w-full border border-stone-200 rounded px-2 py-1 mt-0.5 bg-white" />
+        </label>
+        <label class="block">
+          <span class="text-[10px] uppercase tracking-wider text-stone-400">Color</span>
+          <div class="flex items-center gap-1 mt-0.5">
+            <input type="color" class="tl-color swatch" />
+            <input type="text" class="tl-color-text w-full border border-stone-200 rounded px-2 py-1 bg-white" />
+          </div>
+        </label>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
+        <div>
+          <span class="text-[10px] uppercase tracking-wider text-stone-400">Align</span>
+          <div class="flex gap-1 mt-0.5">
+            <button class="tl-align flex-1 border border-stone-200 rounded px-2 py-1 bg-white" data-align="left">L</button>
+            <button class="tl-align flex-1 border border-stone-200 rounded px-2 py-1 bg-white" data-align="center">C</button>
+            <button class="tl-align flex-1 border border-stone-200 rounded px-2 py-1 bg-white" data-align="right">R</button>
+          </div>
+        </div>
+        <label class="flex items-end gap-2 pb-1">
+          <input type="checkbox" class="tl-italic" />
+          <span class="text-[11px] text-stone-600">Italic</span>
+        </label>
+      </div>
+      <div class="grid grid-cols-4 gap-2 mt-2 text-xs">
+        <label class="block">
+          <span class="text-[10px] uppercase tracking-wider text-stone-400">X %</span>
+          <input type="number" step="0.5" class="tl-x w-full border border-stone-200 rounded px-2 py-1 mt-0.5 bg-white" />
+        </label>
+        <label class="block">
+          <span class="text-[10px] uppercase tracking-wider text-stone-400">Y %</span>
+          <input type="number" step="0.5" class="tl-y w-full border border-stone-200 rounded px-2 py-1 mt-0.5 bg-white" />
+        </label>
+        <label class="block">
+          <span class="text-[10px] uppercase tracking-wider text-stone-400">W %</span>
+          <input type="number" step="0.5" class="tl-w w-full border border-stone-200 rounded px-2 py-1 mt-0.5 bg-white" />
+        </label>
+        <label class="block">
+          <span class="text-[10px] uppercase tracking-wider text-stone-400">Rot °</span>
+          <input type="number" step="0.5" class="tl-rot w-full border border-stone-200 rounded px-2 py-1 mt-0.5 bg-white" />
+        </label>
+      </div>
+    `;
+    const $$$ = sel => row.querySelector(sel);
+    const txt   = $$$('.tl-text');
+    const font  = $$$('.tl-font');
+    const wt    = $$$('.tl-weight');
+    const size  = $$$('.tl-size');
+    const lh    = $$$('.tl-lh');
+    const tr    = $$$('.tl-tracking');
+    const color = $$$('.tl-color');
+    const colorTxt = $$$('.tl-color-text');
+    const italic = $$$('.tl-italic');
+    const xI = $$$('.tl-x');
+    const yI = $$$('.tl-y');
+    const wI = $$$('.tl-w');
+    const rI = $$$('.tl-rot');
+    const upBtn = $$$('.tl-up');
+    const downBtn = $$$('.tl-down');
+    const delBtn = $$$('.tl-del');
+    const alignBtns = row.querySelectorAll('.tl-align');
+
+    txt.value = layer.text;
+    font.value = layer.fontFamily;
+    wt.value = String(layer.fontWeight);
+    size.value = layer.fontSize;
+    lh.value = layer.lineHeight;
+    tr.value = layer.letterSpacing;
+    color.value = layer.color;
+    colorTxt.value = layer.color;
+    italic.checked = !!layer.italic;
+    xI.value = layer.x;
+    yI.value = layer.y;
+    wI.value = layer.w;
+    rI.value = layer.rot;
+    alignBtns.forEach(b => b.classList.toggle('bg-stone-900', b.dataset.align === layer.align));
+    alignBtns.forEach(b => b.classList.toggle('text-white', b.dataset.align === layer.align));
+
+    async function commit() { await saveLibrary(); refreshPreview(); }
+
+    txt.addEventListener('input', () => { layer.text = txt.value; commit(); });
+    font.addEventListener('change', () => { layer.fontFamily = font.value; commit(); });
+    wt.addEventListener('change', () => { layer.fontWeight = parseInt(wt.value, 10); commit(); });
+    size.addEventListener('input', () => { const v = parseFloat(size.value); if (Number.isFinite(v)) { layer.fontSize = v; commit(); } });
+    lh.addEventListener('input', () => { const v = parseFloat(lh.value); if (Number.isFinite(v)) { layer.lineHeight = v; commit(); } });
+    tr.addEventListener('input', () => { const v = parseFloat(tr.value); if (Number.isFinite(v)) { layer.letterSpacing = v; commit(); } });
+    color.addEventListener('input', () => { layer.color = color.value; colorTxt.value = color.value; commit(); });
+    colorTxt.addEventListener('change', () => {
+      const v = colorTxt.value.trim();
+      if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(v)) { layer.color = v; color.value = v; commit(); }
+    });
+    italic.addEventListener('change', () => { layer.italic = italic.checked; commit(); });
+    xI.addEventListener('input', () => { const v = parseFloat(xI.value); if (Number.isFinite(v)) { layer.x = v; commit(); } });
+    yI.addEventListener('input', () => { const v = parseFloat(yI.value); if (Number.isFinite(v)) { layer.y = v; commit(); } });
+    wI.addEventListener('input', () => { const v = parseFloat(wI.value); if (Number.isFinite(v)) { layer.w = v; commit(); } });
+    rI.addEventListener('input', () => { const v = parseFloat(rI.value); if (Number.isFinite(v)) { layer.rot = v; commit(); } });
+    alignBtns.forEach(b => b.addEventListener('click', () => {
+      layer.align = b.dataset.align;
+      alignBtns.forEach(x => x.classList.toggle('bg-stone-900', x.dataset.align === layer.align));
+      alignBtns.forEach(x => x.classList.toggle('text-white', x.dataset.align === layer.align));
+      commit();
+    }));
+    upBtn.addEventListener('click', async () => {
+      if (lIdx === 0) return;
+      const tmp = pin.textLayers[lIdx - 1];
+      pin.textLayers[lIdx - 1] = layer;
+      pin.textLayers[lIdx] = tmp;
+      await saveLibrary(); renderTextLayersList(); refreshPreview();
+    });
+    downBtn.addEventListener('click', async () => {
+      if (lIdx === pin.textLayers.length - 1) return;
+      const tmp = pin.textLayers[lIdx + 1];
+      pin.textLayers[lIdx + 1] = layer;
+      pin.textLayers[lIdx] = tmp;
+      await saveLibrary(); renderTextLayersList(); refreshPreview();
+    });
+    delBtn.addEventListener('click', async () => {
+      if (!confirm('Delete this text layer?')) return;
+      pin.textLayers.splice(lIdx, 1);
+      await saveLibrary(); renderTextLayersList(); refreshPreview();
+    });
+
+    return row;
+  }
+
+  renderTextLayersList();
+
+  async function refreshPreview() {
+    await renderPinIntoPreview(preview, pin);
+  }
+  await refreshPreview();
+  card._refresh = refreshPreview;
+  return card;
+}
+
+async function renderPinIntoPreview(container, pin) {
+  container.innerHTML = '';
+  const tplUrl = pin.templateImageId ? await ensureURL(pin.templateImageId) : null;
+  if (tplUrl) {
+    const bg = document.createElement('img');
+    bg.className = 'bg-img';
+    bg.src = tplUrl;
+    container.appendChild(bg);
+    container.style.aspectRatio = '';
+  } else {
+    const fmt = PIN_FORMATS[pin.format] || PIN_FORMATS['2:3'];
+    container.style.aspectRatio = `${fmt.w} / ${fmt.h}`;
+    const empty = document.createElement('div');
+    empty.className = 'flex items-center justify-center h-full text-xs text-stone-400';
+    empty.textContent = 'No pin template yet — upload one below';
+    empty.style.height = '100%';
+    container.appendChild(empty);
+  }
+  const artUrl = (pin.useMasterArt !== false) ? (masterArt?.url || null) : null;
+  if (tplUrl && pin.useMasterArt !== false) {
+    renderArtRectInside(container, pin.placement, pin.fit, artUrl);
+  }
+  // Render text layers (always — even with no template — so the user can preview overlay)
+  for (const layer of pin.textLayers || []) {
+    container.appendChild(buildTextLayerEl(layer, pin));
+  }
+}
+
+function buildTextLayerEl(layer, pin) {
+  const el = document.createElement('div');
+  el.className = 'text-layer';
+  el.dataset.layerId = layer.id;
+  el.style.left = layer.x + '%';
+  el.style.top = layer.y + '%';
+  el.style.width = layer.w + '%';
+  el.style.transform = `rotate(${layer.rot}deg)`;
+  // Use container height-relative font sizing via container query fallback:
+  // We compute font-size in px using the container's actual height once it's mounted.
+  el.style.fontFamily = `"${layer.fontFamily}", serif`;
+  el.style.fontWeight = layer.fontWeight;
+  el.style.fontStyle = layer.italic ? 'italic' : 'normal';
+  el.style.color = layer.color;
+  el.style.textAlign = layer.align;
+  el.style.lineHeight = layer.lineHeight;
+  el.style.letterSpacing = layer.letterSpacing + 'px';
+  // Newlines preserved via white-space: pre-wrap (set in CSS)
+  el.textContent = layer.text;
+
+  // After insertion, set a font-size in px relative to the container's height.
+  requestAnimationFrame(() => {
+    const c = el.parentElement;
+    if (!c) return;
+    const ch = c.clientHeight || c.getBoundingClientRect().height || 1;
+    el.style.fontSize = ((layer.fontSize / 100) * ch) + 'px';
+  });
+
+  // Edit-mode handles (only visible when slot-preview.editing-text)
+  const resize = document.createElement('div');
+  resize.className = 'tl-handle-resize';
+  el.appendChild(resize);
+  const rotate = document.createElement('div');
+  rotate.className = 'tl-handle-rotate';
+  el.appendChild(rotate);
+  return el;
+}
+
+function attachTextLayerHandlers(container, pin, refreshFn, syncListFn) {
+  let dragging = null;
+
+  container.addEventListener('pointerdown', e => {
+    if (!container.classList.contains('editing-text')) return;
+    const layerEl = e.target.closest('.text-layer');
+    if (!layerEl) return;
+    const layerId = layerEl.dataset.layerId;
+    const layer = (pin.textLayers || []).find(l => l.id === layerId);
+    if (!layer) return;
+    container.querySelectorAll('.text-layer').forEach(el => el.classList.toggle('active', el === layerEl));
+
+    const cRect = container.getBoundingClientRect();
+    const isResize = e.target.classList.contains('tl-handle-resize');
+    const isRotate = e.target.classList.contains('tl-handle-rotate');
+
+    if (isResize) {
+      dragging = { type: 'resize', layer, startX: e.clientX, origW: layer.w, cw: cRect.width };
+    } else if (isRotate) {
+      const r = layerEl.getBoundingClientRect();
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      dragging = {
+        type: 'rotate', layer,
+        cx, cy,
+        startAngle: Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI,
+        origRot: layer.rot,
+      };
+    } else {
+      dragging = {
+        type: 'move', layer,
+        startX: e.clientX, startY: e.clientY,
+        origX: layer.x, origY: layer.y,
+        cw: cRect.width, ch: cRect.height,
+      };
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+
+  document.addEventListener('pointermove', async e => {
+    if (!dragging) return;
+    const { layer } = dragging;
+    if (dragging.type === 'move') {
+      const dx = (e.clientX - dragging.startX) / dragging.cw * 100;
+      const dy = (e.clientY - dragging.startY) / dragging.ch * 100;
+      layer.x = clamp(dragging.origX + dx, -50, 150);
+      layer.y = clamp(dragging.origY + dy, -50, 150);
+    } else if (dragging.type === 'resize') {
+      const dx = (e.clientX - dragging.startX) / dragging.cw * 100;
+      layer.w = clamp(dragging.origW + dx, 4, 200);
+    } else if (dragging.type === 'rotate') {
+      const ang = Math.atan2(e.clientY - dragging.cy, e.clientX - dragging.cx) * 180 / Math.PI;
+      layer.rot = dragging.origRot + (ang - dragging.startAngle);
+    }
+    refreshFn();
+  });
+
+  document.addEventListener('pointerup', async () => {
+    if (!dragging) return;
+    dragging = null;
+    await saveLibrary();
+    if (syncListFn) syncListFn();
+  });
+}
+
+// =========================================================================
+// Drag handlers (shared for mockup + pin slot previews)
+// =========================================================================
+function attachDragHandlers(container, target, refreshFn, syncFn) {
+  let dragging = null;
+
+  container.addEventListener('pointerdown', e => {
+    if (!container.classList.contains('editing')) return;
+    if (e.target.classList.contains('handle-resize') || e.target.classList.contains('handle-rotate')) return;
+    if (!e.target.closest('.art-rect')) return;
+    const rect = container.getBoundingClientRect();
+    dragging = {
+      type: 'move',
+      startX: e.clientX, startY: e.clientY,
+      origX: target.placement.x, origY: target.placement.y,
+      cw: rect.width, ch: rect.height,
+    };
+    e.preventDefault();
+  });
+
+  container.addEventListener('pointerdown', e => {
+    if (!container.classList.contains('editing')) return;
+    if (!e.target.classList.contains('handle-resize')) return;
+    const rect = container.getBoundingClientRect();
+    dragging = {
+      type: 'resize',
+      startX: e.clientX, startY: e.clientY,
+      origW: target.placement.w, origH: target.placement.h,
+      cw: rect.width, ch: rect.height,
+    };
+    e.preventDefault(); e.stopPropagation();
+  }, true);
+
+  container.addEventListener('pointerdown', e => {
+    if (!container.classList.contains('editing')) return;
+    if (!e.target.classList.contains('handle-rotate')) return;
+    const rectEl = container.querySelector('.art-rect').getBoundingClientRect();
+    const cx = rectEl.left + rectEl.width / 2;
+    const cy = rectEl.top + rectEl.height / 2;
+    dragging = {
+      type: 'rotate',
+      cx, cy,
+      startAngle: Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI,
+      origRot: target.placement.rot,
+    };
+    e.preventDefault(); e.stopPropagation();
+  }, true);
+
+  document.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    if (dragging.type === 'move') {
+      const dx = (e.clientX - dragging.startX) / dragging.cw * 100;
+      const dy = (e.clientY - dragging.startY) / dragging.ch * 100;
+      target.placement.x = clamp(dragging.origX + dx, -50, 150);
+      target.placement.y = clamp(dragging.origY + dy, -50, 150);
+    } else if (dragging.type === 'resize') {
+      const dx = (e.clientX - dragging.startX) / dragging.cw * 100;
+      const dy = (e.clientY - dragging.startY) / dragging.ch * 100;
+      target.placement.w = clamp(dragging.origW + dx, 2, 200);
+      target.placement.h = clamp(dragging.origH + dy, 2, 200);
+    } else if (dragging.type === 'rotate') {
+      const ang = Math.atan2(e.clientY - dragging.cy, e.clientX - dragging.cx) * 180 / Math.PI;
+      target.placement.rot = dragging.origRot + (ang - dragging.startAngle);
+    }
+    refreshFn();
+    if (syncFn) syncFn();
+  });
+
+  document.addEventListener('pointerup', () => { dragging = null; });
+}
+
+function refreshAllSlotPreviews() {
+  for (const card of mockupSlotsRoot.children) if (card._refresh) card._refresh();
+  for (const card of pinSlotsRoot.children) if (card._refresh) card._refresh();
+}
+
+// =========================================================================
+// Reset slots buttons
+// =========================================================================
+$('#resetMockupSlotsBtn').addEventListener('click', async () => {
+  if (!confirm('Clear all 10 mockup slots in this collection?')) return;
+  const c = activeCollection();
+  c.scenes = Array.from({ length: NUM_MOCKUP_SLOTS }, (_, i) => Object.assign(emptyScene(), { name: `Scene ${i + 1}` }));
+  c.heroSceneId = null;
+  await saveLibrary();
+  await gcImages();
+  await renderMockupSlots();
+  renderProductionStatus();
+});
+$('#resetPinSlotsBtn').addEventListener('click', async () => {
+  if (!confirm('Clear all 10 pin slots in this collection?')) return;
+  const c = activeCollection();
+  c.pins = Array.from({ length: NUM_PIN_SLOTS }, (_, i) => Object.assign(emptyPin(), { name: `Pin ${i + 1}` }));
+  await saveLibrary();
+  await gcImages();
+  await renderPinSlots();
+  renderProductionStatus();
+});
+
+// =========================================================================
+// Canvas rendering for export
+// =========================================================================
+function loadImageFromBlob(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => { resolve({ img, revoke: () => URL.revokeObjectURL(url) }); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image load failed')); };
+    img.src = url;
+  });
+}
+
+function drawArtIntoRect(ctx, art, placement, outW, outH, fit) {
+  const rectX = (placement.x / 100) * outW;
+  const rectY = (placement.y / 100) * outH;
+  const rectW = (placement.w / 100) * outW;
+  const rectH = (placement.h / 100) * outH;
+  const cx = rectX + rectW / 2;
+  const cy = rectY + rectH / 2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(placement.rot * Math.PI / 180);
+  ctx.translate(-rectW / 2, -rectH / 2);
+
+  const aw = art.naturalWidth, ah = art.naturalHeight;
+  const aRatio = aw / ah;
+  const rRatio = rectW / rectH;
+  let sx = 0, sy = 0, sw = aw, sh = ah;
+  let dx = 0, dy = 0, dw = rectW, dh = rectH;
+
+  if (fit === 'contain') {
+    if (aRatio > rRatio) {
+      dh = rectW / aRatio;
+      dy = (rectH - dh) / 2;
+    } else {
+      dw = rectH * aRatio;
+      dx = (rectW - dw) / 2;
+    }
+    // optional white background behind contained art to mimic mat
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, rectW, rectH);
+    ctx.drawImage(art, sx, sy, sw, sh, dx, dy, dw, dh);
+  } else { // cover
+    if (aRatio > rRatio) {
+      sw = ah * rRatio;
+      sx = (aw - sw) / 2;
+    } else {
+      sh = aw / rRatio;
+      sy = (ah - sh) / 2;
+    }
+    ctx.drawImage(art, sx, sy, sw, sh, 0, 0, rectW, rectH);
+  }
+  ctx.restore();
+}
+
+async function renderSceneToBlob(scene, art) {
+  if (!scene.bgImageId) return null;
+  const bgBlob = await imgGet(scene.bgImageId);
+  if (!bgBlob) return null;
+  const { img: bgImg, revoke: revokeBg } = await loadImageFromBlob(bgBlob);
+  const W = bgImg.naturalWidth, H = bgImg.naturalHeight;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bgImg, 0, 0, W, H);
+  drawArtIntoRect(ctx, art, scene.placement, W, H, scene.fit);
+  if (scene.mode === 'png-overlay' && scene.framePngImageId) {
+    const pngBlob = await imgGet(scene.framePngImageId);
+    if (pngBlob) {
+      const { img: pngImg, revoke: revokePng } = await loadImageFromBlob(pngBlob);
+      // PNG overlay scaled to fit fully inside the canvas (contain)
+      const pngR = pngImg.naturalWidth / pngImg.naturalHeight;
+      const cR = W / H;
+      let dw, dh, dx, dy;
+      if (pngR > cR) { dw = W; dh = W / pngR; dx = 0; dy = (H - dh) / 2; }
+      else           { dh = H; dw = H * pngR; dy = 0; dx = (W - dw) / 2; }
+      ctx.drawImage(pngImg, dx, dy, dw, dh);
+      revokePng();
+    }
+  }
+  revokeBg();
+  return await new Promise(res => canvas.toBlob(res, 'image/png'));
+}
+
+async function renderPinToBlob(pin, art) {
+  if (!pin.templateImageId) return null;
+  const tBlob = await imgGet(pin.templateImageId);
+  if (!tBlob) return null;
+  const { img: tImg, revoke } = await loadImageFromBlob(tBlob);
+  const fmt = PIN_FORMATS[pin.format] || PIN_FORMATS['2:3'];
+  const W = fmt.w, H = fmt.h;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(tImg, 0, 0, W, H);
+  if (pin.useMasterArt !== false && art) {
+    drawArtIntoRect(ctx, art, pin.placement, W, H, pin.fit);
+  }
+  // Preload fonts before drawing text so the right glyphs are rasterized
+  await ensureFontsForLayers(pin.textLayers || [], H);
+  for (const layer of pin.textLayers || []) {
+    drawTextLayer(ctx, layer, W, H);
+  }
+  revoke();
+  return await new Promise(res => canvas.toBlob(res, 'image/png'));
+}
+
+async function ensureFontsForLayers(layers, canvasH) {
+  if (!document.fonts || !layers.length) return;
+  const seen = new Set();
+  const loads = [];
+  for (const l of layers) {
+    const px = (l.fontSize / 100) * canvasH;
+    const style = l.italic ? 'italic' : 'normal';
+    const spec = `${style} ${l.fontWeight} ${px}px "${l.fontFamily}"`;
+    if (seen.has(spec)) continue;
+    seen.add(spec);
+    try { loads.push(document.fonts.load(spec, l.text || 'A')); } catch {}
+  }
+  try { await Promise.all(loads); } catch {}
+}
+
+function drawTextLayer(ctx, layer, W, H) {
+  const px = (layer.fontSize / 100) * H;
+  if (px < 0.5) return;
+  const x = (layer.x / 100) * W;
+  const y = (layer.y / 100) * H;
+  const w = (layer.w / 100) * W;
+  const lineHeightPx = px * (layer.lineHeight || 1.2);
+  const style = layer.italic ? 'italic' : 'normal';
+
+  ctx.save();
+  ctx.font = `${style} ${layer.fontWeight} ${px}px "${layer.fontFamily}", serif`;
+  ctx.fillStyle = layer.color;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = layer.align || 'left';
+
+  // Rotate around the layer box center (matches CSS transform-origin: center)
+  // We don't know the rendered text height yet — assume one line tall for the rotation pivot,
+  // but use a smarter pivot: the bounding box top-y plus half the wrapped block height computed
+  // after wrapping. To keep it simple and consistent with CSS preview, we rotate around
+  // the center of (x, y, w, total wrapped height).
+  // First, compute wrapped lines:
+  const lines = wrapTextForCanvas(ctx, layer.text || '', w, layer.letterSpacing || 0);
+  const totalH = lines.length * lineHeightPx;
+  const cx = x + w / 2;
+  const cy = y + totalH / 2;
+
+  ctx.translate(cx, cy);
+  ctx.rotate((layer.rot || 0) * Math.PI / 180);
+  ctx.translate(-cx, -cy);
+
+  let drawX = x;
+  if (layer.align === 'center') drawX = x + w / 2;
+  else if (layer.align === 'right') drawX = x + w;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const yLine = y + i * lineHeightPx;
+    if (Math.abs(layer.letterSpacing || 0) > 0.1) {
+      drawTextWithLetterSpacing(ctx, line, drawX, yLine, layer.letterSpacing, layer.align || 'left');
+    } else {
+      ctx.fillText(line, drawX, yLine);
+    }
+  }
+  ctx.restore();
+}
+
+function wrapTextForCanvas(ctx, text, maxWidth, letterSpacing) {
+  // Honors explicit \n line breaks; word-wraps within each line.
+  const out = [];
+  const paragraphs = String(text).split(/\r?\n/);
+  for (const para of paragraphs) {
+    if (!para) { out.push(''); continue; }
+    const words = para.split(/(\s+)/); // keep spaces so we can rebuild
+    let line = '';
+    for (const w of words) {
+      const test = line + w;
+      const m = measureWithSpacing(ctx, test, letterSpacing);
+      if (m > maxWidth && line.trim().length) {
+        out.push(line.trimEnd());
+        line = w.replace(/^\s+/, '');
+      } else {
+        line = test;
+      }
+    }
+    if (line.length) out.push(line);
+  }
+  return out.length ? out : [''];
+}
+
+function measureWithSpacing(ctx, text, letterSpacing) {
+  const base = ctx.measureText(text).width;
+  if (!letterSpacing) return base;
+  return base + Math.max(0, text.length - 1) * letterSpacing;
+}
+
+function drawTextWithLetterSpacing(ctx, text, x, y, letterSpacing, align) {
+  const total = measureWithSpacing(ctx, text, letterSpacing);
+  let cursor = x;
+  if (align === 'center') cursor = x - total / 2;
+  else if (align === 'right') cursor = x - total;
+  const prevAlign = ctx.textAlign;
+  ctx.textAlign = 'left';
+  for (const ch of text) {
+    ctx.fillText(ch, cursor, y);
+    cursor += ctx.measureText(ch).width + letterSpacing;
+  }
+  ctx.textAlign = prevAlign;
+}
+
+async function renderPrintToBlob(art, sizeInches) {
+  const outW = Math.round(sizeInches.w * DPI);
+  const outH = Math.round(sizeInches.h * DPI);
+  const canvas = document.createElement('canvas');
+  canvas.width = outW; canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  // center-crop master art to target ratio
+  const aw = art.naturalWidth, ah = art.naturalHeight;
+  const targetRatio = outW / outH;
+  const srcRatio = aw / ah;
+  let sx = 0, sy = 0, sw = aw, sh = ah;
+  if (srcRatio > targetRatio) {
+    sw = ah * targetRatio;
+    sx = (aw - sw) / 2;
+  } else {
+    sh = aw / targetRatio;
+    sy = (ah - sh) / 2;
+  }
+  ctx.drawImage(art, sx, sy, sw, sh, 0, 0, outW, outH);
+  return await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));
+}
+
+// =========================================================================
+// Download buttons
+// =========================================================================
+async function loadMasterAsImage() {
+  const { img, revoke } = await loadImageFromBlob(masterArt.blob);
+  return { img, revoke };
+}
+
+function setBtnLoading(btn, label) {
+  btn.dataset.original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = label;
+}
+function setBtnDone(btn) {
+  btn.disabled = false;
+  btn.textContent = btn.dataset.original;
+}
+
+$('#downloadListingBtn').addEventListener('click', async () => {
+  if (!masterArt) return;
+  const btn = $('#downloadListingBtn');
+  setBtnLoading(btn, 'Rendering listing photos…');
+  try {
+    const { img: art, revoke } = await loadMasterAsImage();
+    try {
+      const c = activeCollection();
+      const scenes = c.scenes.filter(s => s.bgImageId);
+      // Hero first, then the rest in slot order
+      const heroIdx = scenes.findIndex(s => s.id === c.heroSceneId);
+      const ordered = [];
+      if (heroIdx >= 0) ordered.push(scenes[heroIdx]);
+      for (const s of scenes) if (s !== scenes[heroIdx]) ordered.push(s);
+
+      const zip = new JSZip();
+      const folder = zip.folder(`${slugify(outputName.value)}_listing-photos`);
+      let i = 0;
+      for (const s of ordered) {
+        i++;
+        btn.textContent = `Rendering listing photo ${i}/${ordered.length}…`;
+        const blob = await renderSceneToBlob(s, art);
+        if (!blob) continue;
+        const slug = slugify(s.name);
+        const isHero = s.id === c.heroSceneId;
+        const fname = `${pad2(i)}_${isHero ? 'hero_' : ''}${slug}.png`;
+        folder.file(fname, blob);
+      }
+      btn.textContent = 'Zipping…';
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      downloadBlob(zipBlob, `${slugify(outputName.value)}_listing-photos.zip`);
+      toast('Listing photos exported');
+    } finally { revoke(); }
+  } catch (err) {
+    alert('Listing render failed: ' + err.message);
+  } finally { setBtnDone(btn); }
+});
+
+$('#downloadPrintsBtn').addEventListener('click', async () => {
+  if (!masterArt) return;
+  const btn = $('#downloadPrintsBtn');
+  setBtnLoading(btn, 'Rendering prints…');
+  try {
+    const { img: art, revoke } = await loadMasterAsImage();
+    try {
+      const sizes = selectedSizes();
+      const zip = new JSZip();
+      const folder = zip.folder(`${slugify(outputName.value)}_prints`);
+      let i = 0;
+      for (const s of sizes) {
+        i++;
+        btn.textContent = `Rendering print ${i}/${sizes.length}…`;
+        const blob = await renderPrintToBlob(art, s);
+        folder.file(`${slugify(outputName.value)}_${s.id}.jpg`, blob);
+      }
+      btn.textContent = 'Zipping…';
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      downloadBlob(zipBlob, `${slugify(outputName.value)}_prints.zip`);
+      toast('Prints exported');
+    } finally { revoke(); }
+  } catch (err) {
+    alert('Print render failed: ' + err.message);
+  } finally { setBtnDone(btn); }
+});
+
+$('#downloadPinsBtn').addEventListener('click', async () => {
+  if (!masterArt) return;
+  const btn = $('#downloadPinsBtn');
+  setBtnLoading(btn, 'Rendering pins…');
+  try {
+    const { img: art, revoke } = await loadMasterAsImage();
+    try {
+      const c = activeCollection();
+      const pins = c.pins.filter(p => p.templateImageId);
+      const zip = new JSZip();
+      const folder = zip.folder(`${slugify(outputName.value)}_pinterest-pins`);
+      let i = 0;
+      for (const p of pins) {
+        i++;
+        btn.textContent = `Rendering pin ${i}/${pins.length}…`;
+        const blob = await renderPinToBlob(p, art);
+        if (!blob) continue;
+        folder.file(`${pad2(i)}_${slugify(p.name)}_${p.format.replace(':','x')}.png`, blob);
+      }
+      btn.textContent = 'Zipping…';
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      downloadBlob(zipBlob, `${slugify(outputName.value)}_pinterest-pins.zip`);
+      toast('Pinterest pins exported');
+    } finally { revoke(); }
+  } catch (err) {
+    alert('Pin render failed: ' + err.message);
+  } finally { setBtnDone(btn); }
+});
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+
+// =========================================================================
+// Boot
+// =========================================================================
+async function renderAll() {
+  renderCollectionPicker();
+  await renderMockupSlots();
+  await renderPinSlots();
+  renderSizeFamilies();
+  renderProductionStatus();
+}
+
+(async () => {
+  await loadLibrary();
+  await renderAll();
+})();
+
+})();
+</script>
+</body>
+</html>
