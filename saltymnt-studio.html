@@ -209,7 +209,10 @@
               ⬇ Download prints — ZIP 1 (4×6 → 12×16)
             </button>
             <button id="downloadPrintsBtn2" class="w-full bg-stone-700 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-stone-600 disabled:opacity-40" disabled>
-              ⬇ Download prints — ZIP 2 (16×20 → A1)
+              ⬇ Download prints — ZIP 2 (16×20 → 24×36)
+            </button>
+            <button id="downloadPrintsBtn3" class="w-full bg-stone-500 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-stone-400 disabled:opacity-40" disabled>
+              ⬇ Download prints — ZIP 3 (A5 → A1)
             </button>
           </div>
         </div>
@@ -825,6 +828,7 @@ function renderProductionStatus() {
   $('#downloadListingBtn').disabled = !masterArt || scenes.length === 0;
   $('#downloadPrintsBtn1').disabled = !masterArt || sizes.length === 0;
   $('#downloadPrintsBtn2').disabled = !masterArt || sizes.length === 0;
+  $('#downloadPrintsBtn3').disabled = !masterArt || sizes.length === 0;
   $('#downloadPinsBtn').disabled    = !masterArt || pins.length === 0;
 
   $('#prodHint').textContent = !masterArt
@@ -1630,7 +1634,8 @@ $('#downloadListingBtn').addEventListener('click', async () => {
 });
 
 const PRINTS_ZIP1_IDS = new Set(['4x6','5x7','8x10','11x14','12x16']);
-const PRINTS_ZIP2_IDS = new Set(['16x20','18x24','24x36','A5','A4','A3','A2','A1']);
+const PRINTS_ZIP2_IDS = new Set(['16x20','18x24','24x36']);
+const PRINTS_ZIP3_IDS = new Set(['A5','A4','A3','A2','A1']);
 
 async function downloadPrintsZip(btnId, filterIds, zipSuffix, zipLabel) {
   if (!masterArt) return;
@@ -1664,6 +1669,8 @@ $('#downloadPrintsBtn1').addEventListener('click', () =>
   downloadPrintsZip('downloadPrintsBtn1', PRINTS_ZIP1_IDS, 'zip1', 'ZIP 1'));
 $('#downloadPrintsBtn2').addEventListener('click', () =>
   downloadPrintsZip('downloadPrintsBtn2', PRINTS_ZIP2_IDS, 'zip2', 'ZIP 2'));
+$('#downloadPrintsBtn3').addEventListener('click', () =>
+  downloadPrintsZip('downloadPrintsBtn3', PRINTS_ZIP3_IDS, 'zip3', 'ZIP 3'));
 
 $('#downloadPinsBtn').addEventListener('click', async () => {
   if (!masterArt) return;
