@@ -19,10 +19,37 @@ CSV is the whole contract between them — its columns are specified in the sche
 
 ## Installing generate-pins
 
-The scheduler is already installed on the account; this one is not. Install it the same
-way the others got there (skill upload / skill-creator), after which it triggers on
-phrases like "write this week's pins" or "build the pin queue" in any surface — chat,
-Code, or Cowork.
+The scheduler is already installed on the account; this one is not.
+
+Custom skills are stored on the Claude account (they get a `skill_01…` id), not in this
+repo — so editing a file here changes nothing until the skill is re-uploaded. The repo is
+the editable source; the account holds the live copy.
+
+**To install or update:**
+
+1. Package it (see below) — produces `generate-pins.zip`.
+2. Go to **claude.ai → Settings → Capabilities → Skills**.
+3. Upload the zip. To update an existing one, upload again — it replaces in place.
+
+Once installed it triggers on phrases like "write this week's pins" or "build the pin
+queue" in any surface — chat, Code, or Cowork.
+
+## Packaging for upload
+
+The `skill-creator` skill ships a validator and packager. From a session that has it:
+
+```bash
+cd ~/.claude/skills/skill-creator
+python3 -c "
+import sys; sys.path.insert(0,'.')
+sys.argv=['pkg','<REPO>/skills/generate-pins','<REPO>/dist']
+exec(open('scripts/package_skill.py').read())"
+```
+
+It validates the frontmatter, skips `__pycache__` / `*.pyc` / `.DS_Store`, and writes
+`generate-pins.skill` — a plain zip. Rename to `.zip` if the uploader wants that
+extension. Any validation error is fatal; fix it before uploading rather than shipping a
+skill that won't load.
 
 ## Running the builder standalone
 
